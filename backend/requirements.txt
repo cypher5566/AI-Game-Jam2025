@@ -23,8 +23,8 @@ google-auth-httplib2==0.1.1
 websockets>=13.0  # 升級以支援 google-genai
 
 # 資料驗證
-pydantic==2.5.0
-pydantic-settings==2.1.0
+pydantic>=2.8.0  # 升級以支援最新的 supabase-auth
+pydantic-settings>=2.3.0
 
 # 環境變數
 python-dotenv==1.0.0
