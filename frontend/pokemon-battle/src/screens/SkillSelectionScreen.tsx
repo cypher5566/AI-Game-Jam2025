@@ -11,6 +11,7 @@ import {
 import { useGame } from '../contexts/GameContext';
 import { Skill } from '../types';
 import { fetchSkillsByType } from '../services/skillsAPI';
+import { TYPE_ZH_TO_EN } from '../services/apiConfig';
 import PreloadStatus from '../components/PreloadStatus';
 
 const { width, height } = Dimensions.get('window');
@@ -48,7 +49,14 @@ const SkillSelectionScreen: React.FC = () => {
         setError(null);
 
         // 獲取玩家 Pokemon 的屬性
-        const pokemonType = state.aiDeterminedType || 'normal';
+        let pokemonType = state.aiDeterminedType || 'normal';
+
+        // 如果是中文屬性，轉換成英文
+        if (TYPE_ZH_TO_EN[pokemonType]) {
+          console.log(`[SkillSelection] 偵測到中文屬性「${pokemonType}」，轉換為英文`);
+          pokemonType = TYPE_ZH_TO_EN[pokemonType];
+        }
+
         console.log(`[SkillSelection] 開始載入 ${pokemonType} 系技能`);
 
         try {

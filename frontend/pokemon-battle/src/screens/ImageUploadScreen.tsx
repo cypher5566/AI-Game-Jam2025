@@ -131,6 +131,7 @@ const ImageUploadScreen: React.FC<ImageUploadScreenProps> = ({ onComplete }) => 
         });
 
         console.log('[ImageUpload] 背景處理完成，已儲存到 GameContext');
+        console.log('[ImageUpload] 儲存的屬性:', type, '中文:', type_chinese);
       } else {
         console.error('[ImageUpload] 背景處理失敗：結果無效');
       }
