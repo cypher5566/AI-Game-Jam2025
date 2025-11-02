@@ -8,6 +8,7 @@ import ErrorScreen from './src/screens/ErrorScreen';
 import MapScreen from './src/screens/MapScreen';
 import SkillSelectionScreen from './src/screens/SkillSelectionScreen';
 import BattleScreen from './src/screens/BattleScreen';
+import ImageUploadScreen from './src/screens/ImageUploadScreen';
 import { musicManager } from './src/services/MusicManager';
 
 // 遊戲主邏輯
@@ -28,6 +29,7 @@ function GameRouter() {
           case 'map':
           case 'skillSelection':
           case 'loading':
+          case 'imageUpload':
             // 其他畫面播放探索音樂（不中斷）
             await musicManager.playOverworldMusic();
             break;
@@ -47,6 +49,8 @@ function GameRouter() {
       return <StartScreen />;
     case 'dialogue':
       return <DialogueScreen />;
+    case 'imageUpload':
+      return <ImageUploadScreen />;
     case 'loading':
       return <LoadingScreen />;
     case 'error':

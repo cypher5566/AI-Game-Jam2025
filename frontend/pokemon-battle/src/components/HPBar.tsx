@@ -57,9 +57,9 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   barContainer: {
-    height: 12,
+    height: 16,
     position: 'relative',
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   barBackground: {
@@ -68,13 +68,14 @@ const styles = StyleSheet.create({
   },
   barFill: {
     height: '100%',
-    borderRadius: 6,
+    borderRadius: 8,
   },
   hpText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#ffffff',
-    marginTop: 4,
+    marginTop: 6,
     textAlign: 'right',
+    fontWeight: 'bold',
   },
 });
 

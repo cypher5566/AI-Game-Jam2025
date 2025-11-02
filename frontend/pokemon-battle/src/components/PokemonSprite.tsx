@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { Pokemon } from '../types';
 import PlaceholderAsset from './PlaceholderAsset';
 
@@ -111,13 +111,21 @@ const PokemonSprite: React.FC<PokemonSpriteProps> = ({
         },
       ]}
     >
-      <PlaceholderAsset
-        width={64}
-        height={64}
-        color={style.color}
-        label={style.label}
-        style={[styles.sprite, isEnemy && styles.enemySprite]}
-      />
+      {isEnemy ? (
+        <Image
+          source={require('../../assets/pokemon/Boss.png')}
+          style={styles.bossImage}
+          resizeMode="contain"
+        />
+      ) : (
+        <PlaceholderAsset
+          width={64}
+          height={64}
+          color={style.color}
+          label={style.label}
+          style={[styles.sprite]}
+        />
+      )}
     </Animated.View>
   );
 };
@@ -132,6 +140,10 @@ const styles = StyleSheet.create({
   },
   enemySprite: {
     borderColor: 'rgba(255, 100, 100, 0.6)',
+  },
+  bossImage: {
+    width: 256,
+    height: 256,
   },
 });
 

@@ -109,6 +109,14 @@ const DialogueScreen: React.FC = () => {
     } else {
       // 如果需要輸入
       if (currentDialogue.requiresInput) {
+        // 檢查是否是圖片上傳對話（第4個對話：索引3）
+        if (state.dialogueIndex === 3) {
+          // 跳轉到圖片上傳畫面
+          dispatch({ type: 'SET_SCREEN', screen: 'imageUpload' });
+          return;
+        }
+
+        // 其他輸入（命名）
         if (inputValue.trim()) {
           // 保存寶可夢暱稱
           dispatch({ type: 'SET_POKEMON_NICKNAME', nickname: inputValue.trim() });

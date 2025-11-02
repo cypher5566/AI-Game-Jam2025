@@ -16,16 +16,13 @@ export const INTRO_DIALOGUES: DialogueMessage[] = [
   },
   {
     speaker: '博士',
-    text: '現在，請選擇你的第一隻寶可夢吧！我推薦給你這隻小火龍。',
-  },
-  {
-    speaker: '你',
-    text: '太好了！謝謝博士！',
+    text: '在開始冒險前，告訴我你的寶可夢是什麼？請上傳一張圖片！',
+    requiresInput: true,  // 觸發圖片上傳
   },
   {
     speaker: '博士',
-    text: '太好了！那麼，你想給你的小火龍取個什麼名字呢？',
-    requiresInput: true,
+    text: '很好！現在，給你的寶可夢取個名字吧！',
+    requiresInput: true,  // 觸發命名輸入
   },
   {
     speaker: '博士',

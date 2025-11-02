@@ -54,13 +54,16 @@ export interface DialogueMessage {
 }
 
 export interface GameState {
-  currentScreen: 'start' | 'dialogue' | 'map' | 'battle' | 'skillSelection' | 'loading' | 'error';
+  currentScreen: 'start' | 'dialogue' | 'map' | 'battle' | 'skillSelection' | 'loading' | 'error' | 'imageUpload';
   playerPosition: Position;
   playerPokemon: Pokemon[];
   battleState?: BattleState;
   dialogueIndex: number;
   hasSeenIntro: boolean;
   pokemonNickname?: string;  // 玩家的寶可夢暱稱
+  // 圖片上傳相關
+  uploadedImage?: string;  // 上傳的圖片（base64 或 URL）
+  pokemonType?: PokemonType;  // Server 返回的寶可夢屬性
   // 技能選擇相關狀態
   fetchedMoves?: Skill[];  // 當前戰鬥使用的 12 個招式
   selectedSkills?: Skill[];  // 玩家選擇的 4 個技能

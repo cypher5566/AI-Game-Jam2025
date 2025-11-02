@@ -483,12 +483,12 @@ const styles = StyleSheet.create({
   },
   enemySection: {
     position: 'absolute',
-    top: 60,
-    right: 40,
+    top: 20,
+    right: 20,
     alignItems: 'flex-end',
   },
   enemyPokemonContainer: {
-    marginTop: 20,
+    marginTop: 40,
   },
   playerSection: {
     position: 'absolute',
@@ -501,20 +501,20 @@ const styles = StyleSheet.create({
   },
   pokemonInfo: {
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 12,
+    padding: 16,
     borderRadius: 12,
-    minWidth: 200,
+    minWidth: 240,
   },
   pokemonName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   level: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#ffde00',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   battleLog: {
     position: 'absolute',
@@ -608,19 +608,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
   },
   enemyDamageNumber: {
-    top: 40,
-    right: 40,
+    top: 100,
+    right: 100,
   },
   playerDamageNumber: {
     top: 40,
     left: 40,
   },
   damageText: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: 'bold' as const,
     color: '#f44336',
     textShadowColor: '#000',
-    textShadowOffset: { width: 2, height: 2 },
+    textShadowOffset: { width: 3, height: 3 },
     textShadowRadius: 0,
   },
 });

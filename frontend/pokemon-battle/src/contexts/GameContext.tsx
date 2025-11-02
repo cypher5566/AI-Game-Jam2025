@@ -21,6 +21,10 @@ const initialState: GameState = {
 type GameAction =
   | { type: 'SET_SCREEN'; screen: GameState['currentScreen'] }
   | { type: 'MOVE_PLAYER'; position: Position }
+  // 圖片上傳相關
+  | { type: 'SKIP_IMAGE_UPLOAD' }
+  | { type: 'SET_UPLOADED_IMAGE'; image: string }
+  | { type: 'SET_POKEMON_TYPE'; pokemonType: PokemonType }
   // 技能預加載相關
   | { type: 'START_LOADING_SKILLS' }
   | { type: 'SKILLS_LOADED' }
@@ -182,6 +186,28 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         currentEnemy: undefined,
         fetchedMoves: undefined,
         selectedSkills: undefined,
+      };
+
+    // 圖片上傳相關
+    case 'SKIP_IMAGE_UPLOAD':
+      // 跳過圖片上傳，繼續對話流程
+      return {
+        ...state,
+        currentScreen: 'dialogue',
+        dialogueIndex: state.dialogueIndex + 1,
+      };
+
+    case 'SET_UPLOADED_IMAGE':
+      return {
+        ...state,
+        uploadedImage: action.image,
+      };
+
+    case 'SET_POKEMON_TYPE':
+      // TODO: 根據 AI 判定的屬性更新玩家寶可夢
+      return {
+        ...state,
+        pokemonType: action.pokemonType,
       };
 
     // 對話相關

@@ -1,0 +1,285 @@
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { useGame } from '../contexts/GameContext';
+
+/**
+ * 圖片上傳畫面（佔位實作）
+ * 實際的圖片上傳和 AI 判定功能由後端同事實作
+ * 目前提供 UI 介面，點擊後使用預設寶可夢繼續流程
+ */
+const ImageUploadScreen: React.FC = () => {
+  const { dispatch } = useGame();
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // 模擬圖片選擇（實際實作會使用 expo-image-picker）
+  const handleSelectImage = () => {
+    Alert.alert(
+      '功能開發中',
+      '圖片上傳功能將由後端同事整合實作。\n目前將使用預設寶可夢繼續遊戲。',
+      [
+        {
+          text: '確定',
+          onPress: () => {
+            // 模擬選擇了一張圖片
+            setSelectedImage('placeholder');
+          },
+        },
+      ]
+    );
+  };
+
+  // 跳過上傳，使用預設寶可夢
+  const handleSkip = () => {
+    // 繼續到命名對話
+    dispatch({ type: 'SKIP_IMAGE_UPLOAD' });
+  };
+
+  // 確認上傳（目前也是跳過）
+  const handleConfirm = () => {
+    if (!selectedImage) {
+      Alert.alert('提示', '請先選擇圖片，或點擊「跳過」使用預設寶可夢');
+      return;
+    }
+
+    // TODO: 實際實作時，這裡會呼叫 API 上傳圖片
+    // const response = await uploadPokemonImage(imageFile);
+    // dispatch({ type: 'SET_POKEMON_TYPE', pokemonType: response.type });
+
+    // 目前直接跳過
+    Alert.alert(
+      '提示',
+      '圖片上傳功能開發中，將使用預設寶可夢',
+      [
+        {
+          text: '確定',
+          onPress: handleSkip,
+        },
+      ]
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      {/* 背景 */}
+      <View style={styles.background}>
+        <Text style={styles.title}>上傳你的寶可夢圖片</Text>
+        <Text style={styles.subtitle}>AI 將分析圖片並判定你的寶可夢屬性</Text>
+      </View>
+
+      {/* 上傳區域 */}
+      <View style={styles.uploadArea}>
+        {selectedImage ? (
+          <View style={styles.imagePreview}>
+            <Text style={styles.placeholderText}>圖片已選擇</Text>
+            <Text style={styles.hintText}>（實際圖片預覽將由後端整合實作）</Text>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.selectButton} onPress={handleSelectImage}>
+            <Text style={styles.selectButtonText}>📷 選擇圖片</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* 說明文字 */}
+      <View style={styles.infoBox}>
+        <Text style={styles.infoTitle}>💡 上傳說明</Text>
+        <Text style={styles.infoText}>• 建議上傳清晰的寶可夢圖片</Text>
+        <Text style={styles.infoText}>• AI 會自動判定屬性（火、水、電、普通）</Text>
+        <Text style={styles.infoText}>• 圖片將用於生成專屬的像素化寶可夢</Text>
+      </View>
+
+      {/* 功能開發中提示 */}
+      <View style={styles.devNotice}>
+        <Text style={styles.devNoticeText}>
+          🚧 此功能正在開發中
+        </Text>
+        <Text style={styles.devNoticeSubtext}>
+          圖片上傳和 AI 判定功能將由後端團隊整合
+        </Text>
+      </View>
+
+      {/* 按鈕區 */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, styles.skipButton]}
+          onPress={handleSkip}
+        >
+          <Text style={styles.skipButtonText}>跳過（使用預設）</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.button,
+            styles.confirmButton,
+            !selectedImage && styles.buttonDisabled,
+          ]}
+          onPress={handleConfirm}
+          disabled={!selectedImage}
+        >
+          <Text style={styles.confirmButtonText}>
+            {selectedImage ? '確認上傳' : '請先選擇圖片'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* API 整合說明（僅開發環境） */}
+      {__DEV__ && (
+        <View style={styles.devInfo}>
+          <Text style={styles.devInfoTitle}>開發者資訊</Text>
+          <Text style={styles.devInfoText}>
+            API 端點: POST /api/v1/pokemon/upload{'\n'}
+            預期回應: {'{ type: "fire" | "water" | ... }'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1a1a2e',
+    padding: 20,
+    justifyContent: 'center',
+  },
+  background: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#aaa',
+    textAlign: 'center',
+  },
+  uploadArea: {
+    height: 250,
+    backgroundColor: '#16213e',
+    borderRadius: 15,
+    borderWidth: 3,
+    borderColor: '#0f3460',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  selectButton: {
+    backgroundColor: '#e94560',
+    paddingHorizontal: 40,
+    paddingVertical: 20,
+    borderRadius: 10,
+  },
+  selectButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  imagePreview: {
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: '#4ecca3',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  hintText: {
+    color: '#888',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
+  infoBox: {
+    backgroundColor: '#16213e',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  infoTitle: {
+    color: '#4ecca3',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  infoText: {
+    color: '#ccc',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  devNotice: {
+    backgroundColor: '#533483',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  devNoticeText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  devNoticeSubtext: {
+    color: '#ddd',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 15,
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  skipButton: {
+    backgroundColor: '#6c757d',
+  },
+  skipButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  confirmButton: {
+    backgroundColor: '#4ecca3',
+  },
+  confirmButtonText: {
+    color: '#000',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  buttonDisabled: {
+    backgroundColor: '#333',
+    opacity: 0.5,
+  },
+  devInfo: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#2d2d44',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ffd700',
+  },
+  devInfoTitle: {
+    color: '#ffd700',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  devInfoText: {
+    color: '#bbb',
+    fontSize: 12,
+    fontFamily: 'monospace',
+  },
+});
+
+export default ImageUploadScreen;

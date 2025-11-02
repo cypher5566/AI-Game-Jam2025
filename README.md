@@ -145,17 +145,60 @@ npm run build:web
 - [x] 戰鬥日誌
 - [x] 勝負判定
 
-### 🚧 待完成功能
+#### Phase 5: 音效系統 ✅
+- [x] 音樂管理器 (MusicManager)
+- [x] 探索音樂循環播放 (Pixel Dreams)
+- [x] 戰鬥音樂切換 (Pixelated Showdown)
+- [x] 攻擊音效 (Hit SFX)
+- [x] 場景切換音樂管理
 
-#### Phase 5: 後端整合 🚧
-- [ ] 圖片上傳功能
+#### Phase 6: 圖片上傳流程 ✅
+- [x] 圖片上傳畫面 (ImageUploadScreen) - 佔位實作
+- [x] 對話流程整合（上傳 → 命名）
+- [x] GameContext 圖片狀態管理
+- [x] 跳過功能（使用預設寶可夢）
 - [ ] 後端 API 整合
   - [ ] 寶可夢創建 API 連接
   - [ ] 圖片處理狀態查詢
-- [ ] AI 生成寶可夢顯示
+  - [ ] AI 屬性判定結果顯示
 
-#### Phase 6: 戰鬥強化 🚧
-- [ ] 戰鬥流程改版
+### 🚧 待完成功能
+
+#### Phase 7: 多人 Boss 戰系統 📋
+**完整實作文檔**:
+- [BOSS_BATTLE_IMPLEMENTATION.md](./frontend/pokemon-battle/BOSS_BATTLE_IMPLEMENTATION.md)
+- [BOSS_BATTLE_IMPLEMENTATION_PART2.md](./frontend/pokemon-battle/BOSS_BATTLE_IMPLEMENTATION_PART2.md)
+
+**系統特色**:
+- 多玩家同時連線對戰單一 Boss
+- 獨立 5 秒冷卻時間系統
+- WebSocket 即時同步
+- Boss 顯示於右側，尺寸 1.5-2 倍
+- 玩家並列顯示，呈現並肩作戰感
+
+**待實作內容**:
+- [ ] 多人戰鬥畫面 (BossBattleScreen)
+  - [ ] PlayerCard 組件（顯示其他玩家）
+  - [ ] BossCard 組件（放大版 Boss 顯示）
+  - [ ] SkillButtonWithCooldown 組件
+- [ ] 冷卻時間系統
+  - [ ] useCooldown Hook（單技能冷卻）
+  - [ ] useMultiCooldown Hook（多技能管理）
+- [ ] WebSocket 客戶端服務
+  - [ ] 連線管理
+  - [ ] 訊息處理（攻擊、狀態更新、玩家加入/離開）
+  - [ ] 錯誤處理與重連機制
+- [ ] Mock 測試資料
+  - [ ] mockPlayers.ts（模擬多玩家）
+  - [ ] bossData.ts（Boss 資料）
+  - [ ] DevPanel（測試面板）
+- [ ] 後端整合
+  - [ ] WebSocket 伺服器連接
+  - [ ] Boss 戰房間系統
+  - [ ] 即時狀態同步
+
+#### Phase 8: 戰鬥流程改版 🚧
+- [ ] 戰鬥流程強化（單人版）
   - [ ] 新增 VS 過場畫面（1-2秒自動消失）
   - [ ] 技能選擇改為戰鬥畫面上的卡片 overlay
   - [ ] 保持 4輪3選1 技能選擇邏輯
@@ -163,15 +206,8 @@ npm run build:web
 - [ ] 屬性相剋系統整合
 - [ ] 傷害計算 API 整合
 - [ ] 戰鬥動畫強化
-- [ ] 音效和背景音樂
 
-#### Phase 7: 多人連線 ⏳
-- [ ] WebSocket 客戶端
-- [ ] 房間創建/加入
-- [ ] 即時對戰同步
-- [ ] Boss 戰系統
-
-#### Phase 8: 優化與美化 ⏳
+#### Phase 9: 優化與美化 ⏳
 - [ ] UI/UX 優化
 - [ ] 響應式設計
 - [ ] 資源優化
@@ -203,12 +239,14 @@ https://script.google.com/macros/s/AKfycbyvDy_1ke3ko9vP4N5GkkY_9nwxrlDwXrDWv8VZD
 ### 📱 遊戲流程
 
 1. **開始遊戲** → 顯示遊戲標題和開始按鈕
-2. **劇情對話** → 教授介紹遊戲，玩家為寶可夢命名
-3. **技能預加載** → 背景載入 24 個技能到緩衝池
-4. **地圖探索** → 玩家在地圖上移動，觸發隨機遇敵
-5. **技能選擇** → 從 12 個技能中選擇 4 個作為寶可夢招式
-6. **戰鬥** → 回合制戰鬥，使用選擇的技能
-7. **戰鬥結束** → 返回地圖，背景預加載下一批技能
+2. **劇情對話** → 教授介紹遊戲世界
+3. **圖片上傳** → 上傳圖片生成專屬寶可夢（目前可跳過）
+4. **寶可夢命名** → 為寶可夢取名
+5. **技能預加載** → 背景載入 24 個技能到緩衝池
+6. **地圖探索** → 玩家在地圖上移動，觸發隨機遇敵
+7. **技能選擇** → 從 12 個技能中選擇 4 個作為寶可夢招式
+8. **戰鬥** → 回合制戰鬥，使用選擇的技能
+9. **戰鬥結束** → 返回地圖，背景預加載下一批技能
 
 ### 🎮 操作說明
 

@@ -101,6 +101,33 @@ pokemon-battle/
 └── ART_ASSETS_CHECKLIST.md  # 美術素材清單
 ```
 
+## 🎨 圖片素材規格
+
+### 戰鬥精靈圖片
+
+**寶可夢精靈標準尺寸**: **64x64 像素**
+
+- **格式**: PNG 透明背景 (RGBA)
+- **用途**: 戰鬥畫面中的寶可夢精靈顯示
+- **代碼位置**: `src/components/PokemonSprite.tsx:115-116`
+- **需要的圖片狀態**:
+  - 待機 (idle): 1-2 幀
+  - 攻擊 (attack): 2-4 幀
+  - 受擊 (hit): 1 幀
+- **建議檔案大小**: 50-150 KB 每個狀態
+- **高解析度版本** (可選): 128x128 像素 (2倍解析度)
+
+**目前狀態**: 使用彩色佔位符 (PlaceholderAsset)
+- 小火龍: 橙色 🔥
+- 傑尼龜: 藍色 💧
+- 妙蛙種子: 綠色 🌱
+
+**替換步驟**:
+1. 準備 64x64 PNG 圖片 (透明背景)
+2. 放入 `src/assets/pokemon/` 對應目錄
+3. 在 `AssetManager.ts` 中引入
+4. 在 `PokemonSprite.tsx` 中使用 `Image` 取代 `PlaceholderAsset`
+
 ## 🎮 遊戲操作
 
 ### 開始畫面
