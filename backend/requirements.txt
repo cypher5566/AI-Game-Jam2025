@@ -4,7 +4,7 @@ uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 
 # 圖片處理
-pillow==10.1.0
+pillow>=10.1.0
 
 # AI 服務
 # google-generativeai==0.3.1  # DEPRECATED - 將於 2025/8/31 停止支援

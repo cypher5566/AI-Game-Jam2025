@@ -91,13 +91,15 @@ class Settings(BaseSettings):
         "fairy": "妖精"
     }
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = {
+        "env_file": ".env",
+        "env_file_encoding": "utf-8",
+        "case_sensitive": False
+    }
 
 
 # 創建全局設定實例
-settings = Settings()
+settings = Settings(_env_file=".env", _env_file_encoding="utf-8")
 
 
 # 確保上傳目錄存在
