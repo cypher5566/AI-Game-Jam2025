@@ -29,8 +29,10 @@ const BattleScreen: React.FC = () => {
     state.battleState?.enemyPokemon || createBoss('snorlax')
   );
 
-  // 玩家寶可夢
-  const [playerPokemon, setPlayerPokemon] = useState<Pokemon>(state.playerPokemon[0]);
+  // 玩家寶可夢（從 battleState 中獲取，包含選擇的技能）
+  const [playerPokemon, setPlayerPokemon] = useState<Pokemon>(
+    state.battleState?.playerPokemon || state.playerPokemon[0]
+  );
 
   // 玩家選擇狀態
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);

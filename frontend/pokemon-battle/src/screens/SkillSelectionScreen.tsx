@@ -51,22 +51,35 @@ const SkillSelectionScreen: React.FC = () => {
         const pokemonType = state.aiDeterminedType || 'normal';
         console.log(`[SkillSelection] 開始載入 ${pokemonType} 系技能`);
 
-        // 調用後端 API 獲取 12 個技能
-        const skills = await fetchSkillsByType(pokemonType, 12);
+        try {
+          // 調用後端 API 獲取 12 個技能
+          const skills = await fetchSkillsByType(pokemonType, 12);
 
-        if (skills.length < 12) {
-          throw new Error(`技能數量不足（獲得 ${skills.length} 個，需要 12 個）`);
+          if (skills.length >= 12) {
+            // 成功獲取足夠的技能
+            dispatch({ type: 'SET_FETCHED_MOVES', moves: skills });
+            console.log(`[SkillSelection] 成功載入 ${skills.length} 個技能`);
+            setIsLoading(false);
+            return;
+          } else {
+            console.warn(`[SkillSelection] 技能數量不足（${skills.length}/12），使用 fallback`);
+          }
+        } catch (apiError) {
+          console.error('[SkillSelection] API 調用失敗，使用 fallback:', apiError);
         }
 
-        // 儲存到 GameContext
-        dispatch({ type: 'SET_FETCHED_MOVES', moves: skills });
-
-        console.log(`[SkillSelection] 成功載入 ${skills.length} 個技能`);
+        // Fallback: 使用預設技能
+        console.log('[SkillSelection] 使用預設技能組');
+        const fallbackSkills = generateFallbackSkills(pokemonType);
+        dispatch({ type: 'SET_FETCHED_MOVES', moves: fallbackSkills });
         setIsLoading(false);
 
       } catch (error) {
         console.error('[SkillSelection] 載入技能失敗:', error);
-        setError('技能載入失敗，請重試');
+
+        // 最終 fallback: 使用一般屬性技能
+        const fallbackSkills = generateFallbackSkills('normal');
+        dispatch({ type: 'SET_FETCHED_MOVES', moves: fallbackSkills });
         setIsLoading(false);
       }
     };
@@ -168,40 +181,7 @@ const SkillSelectionScreen: React.FC = () => {
     );
   }
 
-  // 載入失敗
-  if (error) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={async () => {
-              try {
-                setError(null);
-                setIsLoading(true);
-
-                const pokemonType = state.aiDeterminedType || 'normal';
-                const skills = await fetchSkillsByType(pokemonType, 12);
-
-                if (skills.length < 12) {
-                  throw new Error('技能數量不足');
-                }
-
-                dispatch({ type: 'SET_FETCHED_MOVES', moves: skills });
-                setIsLoading(false);
-              } catch (err) {
-                setError('技能載入失敗，請重試');
-                setIsLoading(false);
-              }
-            }}
-          >
-            <Text style={styles.retryButtonText}>重試</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
+  // 載入失敗（已移除，因為現在使用 fallback，不會有錯誤畫面）
 
   return (
     <View style={styles.container}>
@@ -340,6 +320,55 @@ const SkillSelectionScreen: React.FC = () => {
       <PreloadStatus />
     </View>
   );
+};
+
+// 生成預設技能（fallback 使用）
+const generateFallbackSkills = (type: string): Skill[] => {
+  const typeNames: Record<string, string> = {
+    fire: '火',
+    water: '水',
+    grass: '草',
+    electric: '電',
+    normal: '一般',
+    fighting: '格鬥',
+    flying: '飛行',
+    poison: '毒',
+    ground: '地面',
+    rock: '岩石',
+    bug: '蟲',
+    ghost: '幽靈',
+    steel: '鋼',
+    psychic: '超能力',
+    ice: '冰',
+    dragon: '龍',
+    dark: '惡',
+    fairy: '妖精',
+  };
+
+  const typeName = typeNames[type] || '一般';
+
+  // 生成 12 個預設技能（3 弱 + 5 中 + 4 強）
+  const skills: Skill[] = [
+    // 弱威力技能 (3個)
+    { id: `fallback_${type}_1`, name: `${typeName}系衝擊`, type, power: 40, accuracy: 100, pp: 35, description: `使用${typeName}系能量進行輕度攻擊。` },
+    { id: `fallback_${type}_2`, name: `${typeName}之風`, type, power: 45, accuracy: 95, pp: 30, description: `釋放${typeName}系能量形成的旋風。` },
+    { id: `fallback_${type}_3`, name: `${typeName}彈`, type, power: 50, accuracy: 100, pp: 25, description: `發射${typeName}系能量球攻擊對手。` },
+
+    // 中威力技能 (5個)
+    { id: `fallback_${type}_4`, name: `${typeName}之牙`, type, power: 65, accuracy: 95, pp: 20, description: `用蘊含${typeName}系能量的牙齒撕咬對手。` },
+    { id: `fallback_${type}_5`, name: `${typeName}爪`, type, power: 70, accuracy: 100, pp: 15, description: `用銳利的爪子進行${typeName}系攻擊。` },
+    { id: `fallback_${type}_6`, name: `${typeName}波動`, type, power: 75, accuracy: 90, pp: 15, description: `釋放${typeName}系波動攻擊對手。` },
+    { id: `fallback_${type}_7`, name: `${typeName}光束`, type, power: 80, accuracy: 100, pp: 10, description: `發射強烈的${typeName}系光束。` },
+    { id: `fallback_${type}_8`, name: `${typeName}風暴`, type, power: 85, accuracy: 90, pp: 10, description: `召喚${typeName}系風暴攻擊對手。` },
+
+    // 強威力技能 (4個)
+    { id: `fallback_${type}_9`, name: `${typeName}爆破`, type, power: 90, accuracy: 85, pp: 10, description: `使用${typeName}系能量製造大爆炸。` },
+    { id: `fallback_${type}_10`, name: `${typeName}猛攻`, type, power: 95, accuracy: 90, pp: 5, description: `以${typeName}系能量進行猛烈攻擊。` },
+    { id: `fallback_${type}_11`, name: `${typeName}衝擊波`, type, power: 100, accuracy: 85, pp: 5, description: `釋放強大的${typeName}系衝擊波。` },
+    { id: `fallback_${type}_12`, name: `終極${typeName}砲`, type, power: 120, accuracy: 80, pp: 5, description: `發射極為強大的${typeName}系終極攻擊。` },
+  ];
+
+  return skills;
 };
 
 // 取得屬性顏色
