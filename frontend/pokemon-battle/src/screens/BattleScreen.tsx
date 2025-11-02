@@ -12,6 +12,7 @@ import PokemonSprite from '../components/PokemonSprite';
 import HPBar from '../components/HPBar';
 import PreloadStatus from '../components/PreloadStatus';
 import { Pokemon, Skill } from '../types';
+import { musicManager } from '../services/MusicManager';
 
 const { width, height } = Dimensions.get('window');
 
@@ -156,6 +157,9 @@ const BattleScreen: React.FC = () => {
 
       showDamage(damage, 'player');
 
+      // 播放攻擊音效
+      musicManager.playHitSound();
+
       Animated.sequence([
         Animated.timing(bgFlashAnim, {
           toValue: 1,
@@ -221,6 +225,9 @@ const BattleScreen: React.FC = () => {
       const newHp = Math.max(0, enemyPokemon.currentHp - damage);
 
       showDamage(damage, 'enemy');
+
+      // 播放攻擊音效
+      musicManager.playHitSound();
 
       Animated.sequence([
         Animated.timing(bgFlashAnim, {
