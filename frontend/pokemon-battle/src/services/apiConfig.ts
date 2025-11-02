@@ -4,7 +4,10 @@
  */
 
 // API 基礎 URL
-export const API_BASE_URL = 'https://genpoke-production.up.railway.app';
+// 本地測試使用 localhost，生產環境使用 Railway
+export const API_BASE_URL = __DEV__
+  ? 'http://localhost:8000'
+  : 'https://genpoke-production.up.railway.app';
 
 // API 端點
 export const API_ENDPOINTS = {

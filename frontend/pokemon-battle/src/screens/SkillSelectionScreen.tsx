@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useGame } from '../contexts/GameContext';
 import { Skill } from '../types';
-import { fetchPokemonMoves } from '../services/pokemonMovesAPI';
+import { fetchSkillsByType } from '../services/skillsAPI';
 import PreloadStatus from '../components/PreloadStatus';
 
 const { width, height } = Dimensions.get('window');
@@ -40,16 +40,38 @@ const SkillSelectionScreen: React.FC = () => {
 
   const currentSkills = getSkillsForRound(currentRound);
 
-  // 初始化：技能已從緩衝池載入
+  // 初始化：從後端 API 獲取技能
   useEffect(() => {
-    // 技能已經從緩衝池載入到 state.fetchedMoves
-    if (state.fetchedMoves && state.fetchedMoves.length >= 12) {
-      setIsLoading(false);
-    } else {
-      // 如果沒有技能，顯示錯誤
-      setError('技能載入失敗，請重試');
-      setIsLoading(false);
-    }
+    const loadSkills = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // 獲取玩家 Pokemon 的屬性
+        const pokemonType = state.aiDeterminedType || 'normal';
+        console.log(`[SkillSelection] 開始載入 ${pokemonType} 系技能`);
+
+        // 調用後端 API 獲取 12 個技能
+        const skills = await fetchSkillsByType(pokemonType, 12);
+
+        if (skills.length < 12) {
+          throw new Error(`技能數量不足（獲得 ${skills.length} 個，需要 12 個）`);
+        }
+
+        // 儲存到 GameContext
+        dispatch({ type: 'SET_FETCHED_MOVES', moves: skills });
+
+        console.log(`[SkillSelection] 成功載入 ${skills.length} 個技能`);
+        setIsLoading(false);
+
+      } catch (error) {
+        console.error('[SkillSelection] 載入技能失敗:', error);
+        setError('技能載入失敗，請重試');
+        setIsLoading(false);
+      }
+    };
+
+    loadSkills();
   }, []);
 
   // 卡牌進場動畫
@@ -154,18 +176,24 @@ const SkillSelectionScreen: React.FC = () => {
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => {
-              setError(null);
-              setIsLoading(true);
-              fetchPokemonMoves('火')
-                .then(moves => {
-                  dispatch({ type: 'SET_FETCHED_MOVES', moves });
-                  setIsLoading(false);
-                })
-                .catch(() => {
-                  setError('招式載入失敗，請重試');
-                  setIsLoading(false);
-                });
+            onPress={async () => {
+              try {
+                setError(null);
+                setIsLoading(true);
+
+                const pokemonType = state.aiDeterminedType || 'normal';
+                const skills = await fetchSkillsByType(pokemonType, 12);
+
+                if (skills.length < 12) {
+                  throw new Error('技能數量不足');
+                }
+
+                dispatch({ type: 'SET_FETCHED_MOVES', moves: skills });
+                setIsLoading(false);
+              } catch (err) {
+                setError('技能載入失敗，請重試');
+                setIsLoading(false);
+              }
             }}
           >
             <Text style={styles.retryButtonText}>重試</Text>
