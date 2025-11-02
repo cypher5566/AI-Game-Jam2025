@@ -8,6 +8,7 @@ import ErrorScreen from './src/screens/ErrorScreen';
 import MapScreen from './src/screens/MapScreen';
 import SkillSelectionScreen from './src/screens/SkillSelectionScreen';
 import BattleScreen from './src/screens/BattleScreen';
+import BossBattleScreen from './src/screens/BossBattleScreen';
 import ImageUploadScreen from './src/screens/ImageUploadScreen';
 import { musicManager } from './src/services/MusicManager';
 
@@ -21,6 +22,7 @@ function GameRouter() {
       try {
         switch (state.currentScreen) {
           case 'battle':
+          case 'bossBattle':
             // 進入戰鬥時播放戰鬥音樂（每次從頭開始）
             await musicManager.playBattleMusic();
             break;
@@ -44,26 +46,39 @@ function GameRouter() {
     handleMusicChange();
   }, [state.currentScreen]);
 
-  switch (state.currentScreen) {
-    case 'start':
-      return <StartScreen />;
-    case 'dialogue':
-      return <DialogueScreen />;
-    case 'imageUpload':
-      return <ImageUploadScreen />;
-    case 'loading':
-      return <LoadingScreen />;
-    case 'error':
-      return <ErrorScreen />;
-    case 'map':
-      return <MapScreen />;
-    case 'skillSelection':
-      return <SkillSelectionScreen />;
-    case 'battle':
-      return <BattleScreen />;
-    default:
-      return <StartScreen />;
-  }
+  // 取得當前主畫面
+  const getCurrentScreen = () => {
+    switch (state.currentScreen) {
+      case 'start':
+        return <StartScreen />;
+      case 'dialogue':
+        return <DialogueScreen />;
+      case 'imageUpload':
+        // ImageUpload 改為彈窗，底層顯示對話畫面
+        return <DialogueScreen />;
+      case 'loading':
+        return <LoadingScreen />;
+      case 'error':
+        return <ErrorScreen />;
+      case 'map':
+        return <MapScreen />;
+      case 'skillSelection':
+        return <SkillSelectionScreen />;
+      case 'battle':
+        return <BattleScreen />;
+      case 'bossBattle':
+        return <BossBattleScreen />;
+      default:
+        return <StartScreen />;
+    }
+  };
+
+  return (
+    <>
+      {getCurrentScreen()}
+      {state.currentScreen === 'imageUpload' && <ImageUploadScreen />}
+    </>
+  );
 }
 
 // App 根組件

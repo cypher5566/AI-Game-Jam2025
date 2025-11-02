@@ -7,6 +7,7 @@ import {
   Animated,
   Dimensions,
   TextInput,
+  Image,
 } from 'react-native';
 import { useGame } from '../contexts/GameContext';
 import { INTRO_DIALOGUES } from '../data/dialogues';
@@ -149,6 +150,15 @@ const DialogueScreen: React.FC = () => {
         <View style={styles.lab}>
           <Text style={styles.labText}>博士的研究所</Text>
         </View>
+
+        {/* 博士人物圖片 */}
+        <View style={styles.professorContainer}>
+          <Image
+            source={require('../../assets/NPCs/Prof.png')}
+            style={styles.professorImage}
+            resizeMode="contain"
+          />
+        </View>
       </View>
 
       {/* 對話框 */}
@@ -259,11 +269,27 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: 'rgba(52, 152, 219, 0.3)',
     borderRadius: 10,
+    position: 'absolute',
+    top: 40,
   },
   labText: {
     fontSize: 24,
     color: '#ecf0f1',
     fontWeight: 'bold',
+  },
+  professorContainer: {
+    position: 'absolute',
+    bottom: 200,
+    left: 0,
+    right: 0,
+    top: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  professorImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: 600,
   },
   dialogueBox: {
     position: 'absolute',
