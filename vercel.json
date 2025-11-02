@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend/pokemon-battle/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "frontend/pokemon-battle/dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}

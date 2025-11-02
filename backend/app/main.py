@@ -81,6 +81,18 @@ async def validate_environment():
     logger.info(f"📍 環境: {settings.environment}")
     logger.info(f"🌐 允許的來源: {', '.join(settings.allowed_origins_list)}")
 
+    # 創建全域房間（單一房間模式）
+    from app.websocket.room import room_manager
+    logger.info("🎮 創建全域房間...")
+    global_room = await room_manager.create_room(
+        max_players=99,  # 允許很多玩家
+        boss_base_hp=1000
+    )
+    # 強制設定房間代碼為 "GLOBAL"
+    room_manager.rooms["GLOBAL"] = room_manager.rooms.pop(global_room.room_code)
+    room_manager.rooms["GLOBAL"].room_code = "GLOBAL"
+    logger.info("✅ 全域房間已創建: GLOBAL (支援多人隨時加入)")
+
 
 # ===== 根路由和健康檢查 =====
 

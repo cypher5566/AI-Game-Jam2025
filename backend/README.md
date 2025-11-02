@@ -2,6 +2,10 @@
 
 AI Game Jam 2025 - GenPoke 專案後端
 
+> **最新更新 (2025-11-02)**: ✅ 已完成全域房間模式 - 支援單人遊玩、隨時加入、自動開始戰鬥！
+>
+> 📖 前端整合請參考: [GLOBAL_ROOM_GUIDE.md](./GLOBAL_ROOM_GUIDE.md)
+
 ## 🚀 快速開始
 
 ### 1. 安裝依賴
@@ -88,15 +92,10 @@ curl -X POST http://localhost:8000/api/v1/pokemon/upload \
 # 2. 查詢處理狀態
 curl http://localhost:8000/api/v1/pokemon/process/xxx-xxx-xxx
 
-# 3. 創建寶可夢
-curl -X POST http://localhost:8000/api/v1/pokemon/create \
-  -H "Content-Type": application/json" \
-  -d '{
-    "name": "小火龍",
-    "type": "fire",
-    "front_image": "data:image/png;base64,...",
-    "back_image": "data:image/png;base64,..."
-  }'
+# 3. 創建寶可夢（名稱可選，會自動生成"火寶"）
+curl -X POST "http://localhost:8000/api/v1/pokemon/create?type=fire&front_image=data:image/png;base64,...&back_image=data:image/png;base64,..."
+# 或提供自訂名稱
+curl -X POST "http://localhost:8000/api/v1/pokemon/create?name=小火龍&type=fire&front_image=data:image/png;base64,...&back_image=data:image/png;base64,..."
 ```
 
 ---
@@ -146,19 +145,37 @@ backend/
 - [x] 像素化處理 (32x32)
 - [x] AI 屬性判斷 (Gemini Vision)
 - [x] 背面圖片生成 (含 fallback 鏡像)
+- [x] Pokemon 名稱自動生成（火寶、水寶...）
 
-### Phase 3: 技能系統 🚧
-- [ ] Google Sheets 整合
-- [ ] 技能獲取 API
+### Phase 3: 技能系統 ✅
+- [x] Google Sheets 整合
+- [x] 923 個技能導入
+- [x] 技能查詢 API（按屬性篩選）
+- [x] 智能技能選擇（弱/中/強搭配）
 
-### Phase 4: 戰鬥系統 🚧
-- [ ] 傷害計算 API
-- [ ] 屬性相剋表 API
+### Phase 4: 戰鬥系統 ✅
+- [x] 簡化傷害公式
+- [x] 18x18 屬性相剋表
+- [x] Prompt 評分系統（Gemini AI）
+- [x] 同步回合制戰鬥
+- [x] 30 秒回合計時器
+- [x] HP 系統與勝負判定
 
-### Phase 5: 多人連線 ⏳
-- [ ] WebSocket 基礎架構
-- [ ] 房間系統
-- [ ] Boss 戰邏輯
+### Phase 5: 多人連線 ✅
+- [x] WebSocket 基礎架構
+- [x] 全域房間系統（GLOBAL）
+- [x] Boss 智能 AI
+- [x] 單人/多人模式（最多 99 人）
+- [x] 隨時加入、自動開始
+- [x] 心跳檢測與斷線處理
+
+### 🎮 全域房間模式（最新！）
+- [x] 單一全域房間（無需創建/加入代碼）
+- [x] 支援單人遊玩
+- [x] 戰鬥中可隨時加入
+- [x] 自動準備、立即開戰
+- [x] Pokemon 名稱自動生成
+- [x] 前端整合文檔完成
 
 ---
 
@@ -193,8 +210,14 @@ backend/
 
 ## 📚 詳細文檔
 
+### 核心文檔
+- [🎮 全域房間整合指南](./GLOBAL_ROOM_GUIDE.md) - **前端必讀！** 單一房間模式完整說明
+- [⚔️ 戰鬥系統實作總結](./BATTLE_SYSTEM_IMPLEMENTATION.md) - 回合制戰鬥、Prompt 評分系統
+- [🔌 前端 WebSocket 整合](./FRONTEND_INTEGRATION_GUIDE.md) - WebSocket 協議與範例代碼
+
+### 其他文檔
 - [系統架構文檔](./ARCHITECTURE.md) - 完整的系統設計和 API 規範
-- [資料庫遷移](./migrations/README.md) - 資料庫設置指南
+- [CLAUDE 開發日誌](./CLAUDE.md) - 後端開發狀態與歷程
 
 ---
 
@@ -214,11 +237,22 @@ A: `./uploads/` 目錄。處理完成後會自動清理。
 
 ---
 
-## 🎯 接下來的開發
+## 🎯 已完成開發
 
-1. **Phase 3**: 整合 Google Sheets 技能資料
-2. **Phase 4**: 實作戰鬥計算邏輯
-3. **Phase 5**: 建立 WebSocket 多人系統
+### ✅ 所有核心功能已完成！
+
+1. ✅ **Phase 1-5**: 所有階段完成
+2. ✅ **全域房間模式**: 簡化玩家體驗
+3. ✅ **戰鬥系統**: Prompt 評分、回合制、HP 系統
+4. ✅ **多人連線**: WebSocket、單人/多人模式
+
+### 🚀 可選優化（Game Jam 後）
+
+- [ ] 斷線自動重連
+- [ ] 戰鬥回放系統
+- [ ] 排行榜（Prompt 評分）
+- [ ] Boss AI 難度調整
+- [ ] 更真實的背面圖生成
 
 ---
 

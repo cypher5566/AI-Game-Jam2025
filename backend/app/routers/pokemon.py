@@ -217,20 +217,20 @@ async def get_processing_status(upload_id: str):
 
 @router.post("/create")
 async def create_pokemon(
-    name: str,
     type: str,
     front_image: str,
     back_image: str,
+    name: str = None,
     user_id: str = None
 ):
     """
     創建寶可夢記錄到資料庫
 
     Args:
-        name: 寶可夢名稱
-        type: 屬性
-        front_image: 正面圖 (base64)
-        back_image: 背面圖 (base64)
+        type: 屬性（必填）
+        front_image: 正面圖 (base64)（必填）
+        back_image: 背面圖 (base64)（必填）
+        name: 寶可夢名稱（可選，若不提供則自動生成，如"火寶"）
         user_id: 用戶 ID (可選)
 
     Returns:
@@ -245,6 +245,12 @@ async def create_pokemon(
     """
     try:
         db = get_service_db()
+
+        # 如果沒有提供名稱，自動生成（如：火寶、水寶）
+        if not name:
+            type_chinese = settings.POKEMON_TYPES_CHINESE.get(type, type)
+            name = f"{type_chinese}寶"
+            logger.info(f"✨ 自動生成寶可夢名稱: {name} ({type}系)")
 
         # 插入資料
         result = db.table("pokemon").insert({

@@ -172,8 +172,15 @@ async def websocket_room(
     # 廣播房間更新
     await broadcast_room_update(room_code)
 
-    # Boss 實例（戰鬥中才有）
+    # GLOBAL 房間自動開始戰鬥（單人也可玩）
     boss: Optional[Boss] = None
+    if room_code == "GLOBAL" and room.status == "waiting" and len(room.members) >= 1:
+        logger.info(f"🎮 GLOBAL 房間自動開始戰鬥（玩家數: {len(room.members)}）")
+        boss = await BossService.generate_boss(
+            player_count=len(room.members),
+            base_hp=room.boss_base_hp
+        )
+        await start_battle(room_code, room, boss)
 
     try:
         while True:
@@ -203,8 +210,18 @@ async def websocket_room(
 
                     await broadcast_room_update(room_code)
 
-                    # 檢查是否所有人都準備好
-                    if room.is_all_ready() and room.status == "waiting":
+                    # 檢查是否可以開始戰鬥
+                    # GLOBAL 房間：有至少1人即可開始
+                    # 其他房間：需要所有人準備好
+                    can_start = False
+                    if room_code == "GLOBAL":
+                        can_start = len(room.members) >= 1 and any(m.is_ready for m in room.members.values())
+                    else:
+                        can_start = room.is_all_ready()
+
+                    if can_start and room.status == "waiting":
+                        logger.info(f"🎮 開始戰鬥: 房間 {room_code}，玩家數 {len(room.members)}")
+
                         # 生成 Boss
                         boss = await BossService.generate_boss(
                             player_count=len(room.members),

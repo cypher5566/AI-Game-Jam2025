@@ -280,14 +280,14 @@ class RoomManager:
         創建房間
 
         Args:
-            max_players: 最大玩家數（2-4）
+            max_players: 最大玩家數（2-99，全域房間可設為 99）
             boss_base_hp: Boss 基礎血量
 
         Returns:
             Room 實例
         """
-        # 驗證參數
-        max_players = max(2, min(4, max_players))
+        # 驗證參數（允許 2-99 玩家，支援全域房間）
+        max_players = max(2, min(99, max_players))
         boss_base_hp = boss_base_hp or settings.boss_base_hp
 
         room_code = self.generate_room_code()
@@ -336,10 +336,14 @@ class RoomManager:
 
         room = self.rooms[room_code]
 
-        # 檢查房間狀態
-        if room.status != "waiting":
+        # 檢查房間狀態（GLOBAL 房間允許隨時加入）
+        if room.status != "waiting" and room_code != "GLOBAL":
             logger.warning(f"⚠️  房間 {room_code} 已開始或結束")
             return None
+
+        # GLOBAL 房間允許在戰鬥中加入
+        if room_code == "GLOBAL" and room.status == "battle":
+            logger.info(f"✅ 玩家 {player_name} 加入進行中的戰鬥")
 
         # 獲取寶可夢資料
         try:
@@ -357,6 +361,12 @@ class RoomManager:
 
         # 創建成員並加入房間
         member = RoomMember(connection_id, pokemon_id, pokemon_data, player_name)
+
+        # GLOBAL 房間自動設為準備好（無需等待）
+        if room_code == "GLOBAL":
+            member.is_ready = True
+            logger.info(f"✅ GLOBAL 房間玩家 {player_name} 自動設為準備狀態")
+
         if not room.add_member(member):
             return None
 
@@ -366,7 +376,7 @@ class RoomManager:
                 "room_id": room_code,  # 使用 room_code 作為臨時 ID
                 "pokemon_id": pokemon_id,
                 "user_id": connection_id,
-                "is_ready": False
+                "is_ready": room_code == "GLOBAL"  # GLOBAL 房間自動準備
             }).execute()
         except Exception as e:
             logger.error(f"❌ 儲存房間成員失敗: {e}")
