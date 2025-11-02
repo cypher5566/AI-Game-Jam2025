@@ -5,7 +5,7 @@
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import List, ClassVar, Dict
+from typing import List, ClassVar, Dict, Optional
 import os
 
 
@@ -20,13 +20,13 @@ class Settings(BaseSettings):
     # Google Gemini AI 配置
     gemini_api_key: str = Field(..., env="GEMINI_API_KEY")
 
-    # Google Sheets 配置
+    # Google Sheets 配置（可選，技能系統有 CSV fallback）
     google_sheets_credentials_file: str = Field(
         default="credentials.json",
         env="GOOGLE_SHEETS_CREDENTIALS_FILE"
     )
-    pokemon_moves_sheet_id: str = Field(
-        ...,
+    pokemon_moves_sheet_id: Optional[str] = Field(
+        default=None,
         env="POKEMON_MOVES_SHEET_ID"
     )
 
