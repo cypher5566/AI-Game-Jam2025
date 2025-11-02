@@ -1,13 +1,19 @@
 """
 Gemini AI 服務
 負責使用 Google Gemini API 進行圖片分析和生成
+
+使用新的 Google GenAI SDK (google-genai)
+- Vision API: gemini-2.5-flash
+- Image Generation: gemini-2.5-flash-image (Nano Banana 🍌)
 """
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from PIL import Image
 import io
 import logging
 from typing import Optional
+import os
 
 from app.config import settings
 
@@ -18,13 +24,23 @@ class GeminiService:
     """Gemini AI 服務類"""
 
     def __init__(self):
-        """初始化 Gemini API"""
+        """初始化 Gemini API 客戶端"""
         try:
-            genai.configure(api_key=settings.gemini_api_key)
-            # 使用 Gemini 2.5 Flash 模型
-            self.vision_model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            # TODO: Image generation 可能需要不同的模型或 API
+            # 使用新的 SDK - 需要顯式創建 Client
+            api_key = settings.gemini_api_key or os.getenv("GEMINI_API_KEY")
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY 未設置")
+
+            self.client = genai.Client(api_key=api_key)
+
+            # 模型名稱
+            self.vision_model = 'gemini-2.5-flash'  # 用於屬性判斷
+            self.image_model = 'gemini-2.5-flash-image'  # 用於圖片生成 (Nano Banana)
+
             logger.info("✅ Gemini API 初始化成功")
+            logger.info(f"   Vision Model: {self.vision_model}")
+            logger.info(f"   Image Model: {self.image_model}")
+
         except Exception as e:
             logger.error(f"❌ Gemini API 初始化失敗: {e}")
             raise
@@ -78,8 +94,11 @@ class GeminiService:
 **只需回傳一個英文單字，例如: fire**
 """
 
-            # 調用 Gemini Vision API
-            response = self.vision_model.generate_content([prompt, image])
+            # 調用 Gemini Vision API (新 SDK)
+            response = self.client.models.generate_content(
+                model=self.vision_model,
+                contents=[prompt, image]
+            )
 
             # 解析結果
             detected_type = response.text.strip().lower()
@@ -99,40 +118,82 @@ class GeminiService:
 
     async def generate_back_view(self, front_image_bytes: bytes, pokemon_type: str) -> Optional[bytes]:
         """
-        生成寶可夢背面圖片
+        生成寶可夢背面圖片 (使用 Gemini 2.5 Flash Image - Nano Banana 🍌)
 
         Args:
-            front_image_bytes: 正面圖片
+            front_image_bytes: 正面圖片 (32x32 像素化後的圖片)
             pokemon_type: 寶可夢屬性
 
         Returns:
             背面圖片 bytes，如果失敗返回 None
 
-        Note:
-            目前 Gemini API 可能沒有直接的圖片生成功能
-            這裡提供架構，實際實作可能需要：
-            1. 使用其他 API (如 DALL-E, Stable Diffusion)
-            2. 或使用簡單的鏡像作為 fallback
+        實作方式:
+            1. 使用 Gemini 2.5 Flash Image 進行圖片生成
+            2. Prompt 要求生成背面視角
+            3. 保持像素風格
         """
         try:
-            # TODO: 實作真正的 AI 圖片生成
-            # 目前 Gemini 2.5 Flash 主要是文字和分析，沒有圖片生成
-            # 可能的選項:
-            # 1. 使用 Imagen (Google 的圖片生成模型) - 需要額外配置
-            # 2. 使用 OpenAI DALL-E
-            # 3. 使用 Stable Diffusion
+            # 載入正面圖片
+            front_image = Image.open(io.BytesIO(front_image_bytes))
 
-            logger.warning("⚠️  AI 圖片生成尚未實作，返回 None (將使用 fallback)")
+            # 獲取中文屬性名稱
+            type_chinese = settings.POKEMON_TYPES_CHINESE.get(pokemon_type, "一般")
+
+            # 構建 prompt - 要求生成背面圖片
+            prompt = f"""
+Based on this front-view image, generate the BACK VIEW (from behind) of this pokemon character.
+
+Requirements:
+- Show the pokemon from BEHIND (back view, not front)
+- Maintain the EXACT same pixel art style (32x32 pixel aesthetic)
+- Keep the same color scheme and {pokemon_type} type characteristics ({type_chinese}系)
+- Simple and clear design
+- Same size and proportions
+- The pokemon should be facing AWAY from the viewer
+
+Important: This is a back sprite for a pokemon game, similar to Pokemon games where you see your pokemon from behind in battle.
+"""
+
+            logger.info(f"🎨 開始生成背面圖片 (使用 {self.image_model})...")
+            logger.debug(f"   屬性: {pokemon_type} ({type_chinese})")
+
+            # 調用 Gemini 2.5 Flash Image API
+            response = self.client.models.generate_content(
+                model=self.image_model,
+                contents=[prompt, front_image],
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],  # 只返回圖片
+                    image_config=types.ImageConfig(
+                        aspect_ratio="1:1"  # 正方形圖片
+                    )
+                )
+            )
+
+            # 提取生成的圖片
+            for part in response.parts:
+                if part.inline_data is not None:
+                    # 獲取圖片數據
+                    generated_image_bytes = part.inline_data.data
+
+                    logger.info("✅ AI 背面圖片生成成功")
+                    logger.debug(f"   圖片大小: {len(generated_image_bytes)} bytes")
+
+                    return generated_image_bytes
+
+            # 如果沒有找到圖片數據
+            logger.warning("⚠️  API 返回成功但沒有圖片數據")
             return None
 
         except Exception as e:
             logger.error(f"❌ AI 背面生成失敗: {e}")
+            logger.info("   將使用 fallback 機制（鏡像翻轉）")
             return None
 
-    async def generate_back_view_with_prompt(self, pokemon_type: str) -> Optional[bytes]:
+    async def generate_back_view_with_prompt_only(self, pokemon_type: str) -> Optional[bytes]:
         """
-        使用純文字 prompt 生成背面圖片
-        這個方法預留給未來整合圖片生成 API
+        使用純文字 prompt 生成背面圖片（不需要正面圖片）
+
+        這個方法用於從頭生成寶可夢背面圖，不依賴正面圖片
 
         Args:
             pokemon_type: 寶可夢屬性
@@ -144,18 +205,44 @@ class GeminiService:
             type_chinese = settings.POKEMON_TYPES_CHINESE.get(pokemon_type, "一般")
 
             prompt = f"""
-Generate a 32x32 pixel art style image of the back view of a {pokemon_type}-type pokemon.
+Generate a 32x32 pixel art style image of the BACK VIEW (from behind) of a {pokemon_type}-type pokemon.
 
 Style requirements:
-- Pixel art aesthetic
+- Pixel art aesthetic (像素風格)
 - Back view (showing the pokemon from behind)
-- {type_chinese} type characteristics
+- {type_chinese} type characteristics ({pokemon_type} 系寶可夢特徵)
 - Simple and clear design
 - Cute and friendly appearance
+- Square format (1:1 aspect ratio)
+
+The pokemon should be:
+- Facing AWAY from the viewer
+- Showing its back
+- In the style of classic Pokemon game back sprites
 """
 
-            # TODO: 整合圖片生成 API
-            logger.info(f"📝 生成 prompt: {prompt}")
+            logger.info(f"🎨 開始生成背面圖片 (純文字 prompt)...")
+
+            # 調用 Gemini 2.5 Flash Image API
+            response = self.client.models.generate_content(
+                model=self.image_model,
+                contents=[prompt],
+                config=types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                    image_config=types.ImageConfig(
+                        aspect_ratio="1:1"
+                    )
+                )
+            )
+
+            # 提取生成的圖片
+            for part in response.parts:
+                if part.inline_data is not None:
+                    generated_image_bytes = part.inline_data.data
+                    logger.info("✅ AI 背面圖片生成成功 (純文字)")
+                    return generated_image_bytes
+
+            logger.warning("⚠️  API 返回成功但沒有圖片數據")
             return None
 
         except Exception as e:

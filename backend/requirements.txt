@@ -7,7 +7,8 @@ python-multipart==0.0.6
 pillow==10.1.0
 
 # AI 服務
-google-generativeai==0.3.1
+# google-generativeai==0.3.1  # DEPRECATED - 將於 2025/8/31 停止支援
+google-genai>=1.0.0  # 新的統一 Google GenAI SDK (支援 Gemini 2.5 Flash Image)
 
 # 資料庫
 supabase==2.0.3

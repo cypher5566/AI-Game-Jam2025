@@ -18,9 +18,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# 儲存處理狀態（簡化版，生產環境應使用資料庫或 Redis）
-processing_status: Dict[str, Dict[str, Any]] = {}
-
 
 @router.post("/upload")
 async def upload_pokemon_image(
@@ -44,15 +41,15 @@ async def upload_pokemon_image(
         # 儲存上傳的圖片
         upload_id, file_path = await ImageProcessor.save_upload(file)
 
-        # 初始化處理狀態
-        processing_status[upload_id] = {
-            "status": "processing",
+        # 在資料庫建立處理記錄
+        db = get_service_db()
+        db.table("upload_queue").insert({
+            "upload_id": upload_id,
             "file_path": file_path,
-            "front_image": None,
-            "back_image": None,
-            "type": None,
-            "error": None
-        }
+            "status": "processing",
+            "processed_data": None,
+            "error_message": None
+        }).execute()
 
         # 在背景處理圖片
         background_tasks.add_task(process_pokemon_image, upload_id, file_path)
@@ -78,6 +75,8 @@ async def process_pokemon_image(upload_id: str, file_path: str):
     2. AI 判斷屬性
     3. 生成/鏡像背面圖
     """
+    db = get_service_db()
+
     try:
         logger.info(f"🔄 開始處理圖片: {upload_id}")
 
@@ -85,16 +84,10 @@ async def process_pokemon_image(upload_id: str, file_path: str):
         front_image_bytes = await ImageProcessor.pixelate(file_path)
         front_image_b64 = ImageProcessor.to_base64(front_image_bytes)
 
-        # 更新狀態
-        processing_status[upload_id]["front_image"] = front_image_b64
-
         # 2. AI 判斷屬性
         gemini = get_gemini_service()
         pokemon_type = await gemini.detect_pokemon_type(front_image_bytes)
-
-        # 更新狀態
-        processing_status[upload_id]["type"] = pokemon_type
-        processing_status[upload_id]["type_chinese"] = settings.POKEMON_TYPES_CHINESE.get(pokemon_type, "未知")
+        type_chinese = settings.POKEMON_TYPES_CHINESE.get(pokemon_type, "未知")
 
         # 3. 嘗試生成背面圖
         back_image_bytes = await gemini.generate_back_view(front_image_bytes, pokemon_type)
@@ -106,11 +99,16 @@ async def process_pokemon_image(upload_id: str, file_path: str):
 
         back_image_b64 = ImageProcessor.to_base64(back_image_bytes)
 
-        # 更新狀態為完成
-        processing_status[upload_id].update({
+        # 更新資料庫狀態為完成
+        db.table("upload_queue").update({
             "status": "completed",
-            "back_image": back_image_b64
-        })
+            "processed_data": {
+                "front_image": front_image_b64,
+                "back_image": back_image_b64,
+                "type": pokemon_type,
+                "type_chinese": type_chinese
+            }
+        }).eq("upload_id", upload_id).execute()
 
         logger.info(f"✅ 圖片處理完成: {upload_id} (屬性: {pokemon_type})")
 
@@ -119,10 +117,11 @@ async def process_pokemon_image(upload_id: str, file_path: str):
 
     except Exception as e:
         logger.error(f"❌ 圖片處理失敗: {upload_id} - {e}")
-        processing_status[upload_id].update({
+        # 更新資料庫狀態為失敗
+        db.table("upload_queue").update({
             "status": "failed",
-            "error": str(e)
-        })
+            "error_message": str(e)
+        }).eq("upload_id", upload_id).execute()
 
 
 @router.get("/process/{upload_id}")
@@ -145,39 +144,53 @@ async def get_processing_status(upload_id: str):
             }
         }
     """
-    if upload_id not in processing_status:
-        raise HTTPException(status_code=404, detail="找不到此上傳記錄")
+    try:
+        db = get_service_db()
 
-    status_data = processing_status[upload_id]
+        # 從資料庫查詢處理狀態
+        result = db.table("upload_queue").select("*").eq("upload_id", upload_id).execute()
 
-    if status_data["status"] == "failed":
+        if not result.data or len(result.data) == 0:
+            raise HTTPException(status_code=404, detail="找不到此上傳記錄")
+
+        record = result.data[0]
+        status = record["status"]
+
+        if status == "failed":
+            return {
+                "success": False,
+                "status": "failed",
+                "error": {
+                    "code": "PROCESSING_FAILED",
+                    "message": record.get("error_message", "處理失敗")
+                }
+            }
+
+        if status == "processing":
+            return {
+                "success": True,
+                "status": "processing",
+                "message": "正在處理中，請稍候..."
+            }
+
+        # completed
+        processed_data = record.get("processed_data", {})
         return {
-            "success": False,
-            "status": "failed",
-            "error": {
-                "code": "PROCESSING_FAILED",
-                "message": status_data.get("error", "處理失敗")
+            "success": True,
+            "status": "completed",
+            "data": {
+                "front_image": processed_data.get("front_image"),
+                "back_image": processed_data.get("back_image"),
+                "type": processed_data.get("type"),
+                "type_chinese": processed_data.get("type_chinese")
             }
         }
 
-    if status_data["status"] == "processing":
-        return {
-            "success": True,
-            "status": "processing",
-            "message": "正在處理中，請稍候..."
-        }
-
-    # completed
-    return {
-        "success": True,
-        "status": "completed",
-        "data": {
-            "front_image": status_data["front_image"],
-            "back_image": status_data["back_image"],
-            "type": status_data["type"],
-            "type_chinese": status_data["type_chinese"]
-        }
-    }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"❌ 查詢處理狀態失敗: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/create")
