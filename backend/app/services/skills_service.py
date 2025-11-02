@@ -103,11 +103,23 @@ class SkillsService:
 
     def load_skills(self, csv_path: str = None):
         """
-        從 CSV 檔案載入技能
+        載入技能資料
+
+        優先順序:
+        1. 從 Supabase 資料庫載入
+        2. 從 CSV 檔案載入
+        3. 使用預設技能
 
         Args:
             csv_path: CSV 檔案路徑，如果不提供則使用預設路徑
         """
+        # 優先從資料庫載入
+        if self._load_from_database():
+            return
+
+        # Fallback: 從 CSV 載入
+        logger.info("⚠️  無法從資料庫載入，嘗試從 CSV 載入...")
+
         if csv_path is None:
             csv_path = os.path.join('data', 'pokemon_moves.csv')
 
@@ -127,19 +139,71 @@ class SkillsService:
                         self.skills.append(skill)
 
             # 按屬性分類
-            self.skills_by_type = {}
-            for skill in self.skills:
-                if skill.type not in self.skills_by_type:
-                    self.skills_by_type[skill.type] = []
-                self.skills_by_type[skill.type].append(skill)
-
+            self._organize_by_type()
             self._loaded = True
-            logger.info(f"✅ 成功載入 {len(self.skills)} 個技能")
-            logger.info(f"📊 屬性分布: {[(t, len(s)) for t, s in self.skills_by_type.items()]}")
+            logger.info(f"✅ 從 CSV 載入 {len(self.skills)} 個技能")
 
         except Exception as e:
             logger.error(f"❌ 載入技能失敗: {e}")
             self._load_default_skills()
+
+    def _load_from_database(self) -> bool:
+        """
+        從 Supabase 資料庫載入技能
+
+        Returns:
+            是否成功載入
+        """
+        try:
+            from app.database import get_service_db
+
+            db = get_service_db()
+            result = db.table('skills').select('*').execute()
+
+            if not result.data:
+                logger.warning("⚠️  資料庫中沒有技能資料")
+                return False
+
+            # 轉換資料庫格式
+            for row in result.data:
+                skill_data = {
+                    '編號': str(row.get('skill_number', '')),
+                    '中文名': row.get('name_zh', ''),
+                    '日文名': row.get('name_ja', ''),
+                    '英文名': row.get('name_en', ''),
+                    '屬性': row.get('type_zh', ''),
+                    '分類': row.get('category', ''),
+                    '威力': str(row.get('power', 0)),
+                    '命中': str(row.get('accuracy', 100)),
+                    'PP': str(row.get('pp', 0)),
+                    '說明': row.get('description', '')
+                }
+
+                skill = Skill(skill_data)
+                # 只保留有威力的技能（攻擊技能）
+                if skill.power > 0:
+                    self.skills.append(skill)
+
+            # 按屬性分類
+            self._organize_by_type()
+            self._loaded = True
+
+            logger.info(f"✅ 從資料庫載入 {len(self.skills)} 個技能")
+            logger.info(f"📊 屬性分布: {[(t, len(s)) for t, s in self.skills_by_type.items()]}")
+
+            return True
+
+        except Exception as e:
+            logger.warning(f"⚠️  從資料庫載入技能失敗: {e}")
+            return False
+
+    def _organize_by_type(self):
+        """按屬性分類技能"""
+        self.skills_by_type = {}
+        for skill in self.skills:
+            if skill.type not in self.skills_by_type:
+                self.skills_by_type[skill.type] = []
+            self.skills_by_type[skill.type].append(skill)
 
     def _load_default_skills(self):
         """載入預設技能（fallback）"""

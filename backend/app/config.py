@@ -5,7 +5,7 @@
 
 from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import List
+from typing import List, ClassVar, Dict
 import os
 
 
@@ -64,13 +64,13 @@ class Settings(BaseSettings):
     algorithm: str = Field(default="HS256", env="ALGORITHM")
 
     # 18種寶可夢屬性
-    POKEMON_TYPES = [
+    POKEMON_TYPES: ClassVar[List[str]] = [
         "normal", "fire", "water", "electric", "grass", "ice",
         "fighting", "poison", "ground", "flying", "psychic", "bug",
         "rock", "ghost", "dragon", "dark", "steel", "fairy"
     ]
 
-    POKEMON_TYPES_CHINESE = {
+    POKEMON_TYPES_CHINESE: ClassVar[Dict[str, str]] = {
         "normal": "一般",
         "fire": "火",
         "water": "水",
