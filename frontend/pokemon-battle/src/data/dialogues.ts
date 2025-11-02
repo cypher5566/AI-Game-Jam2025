@@ -17,7 +17,7 @@ export const INTRO_DIALOGUES: DialogueMessage[] = [
   {
     speaker: '博士',
     text: '在開始冒險前，告訴我你的寶可夢是什麼？請上傳一張圖片！',
-    requiresInput: true,  // 觸發圖片上傳
+    requiresImageUpload: true,  // 觸發圖片上傳
   },
   {
     speaker: '博士',

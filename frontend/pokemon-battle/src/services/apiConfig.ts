@@ -15,6 +15,12 @@ export const API_ENDPOINTS = {
   // 技能相關
   SKILLS: '/api/v1/skills',
   SKILLS_TYPES: '/api/v1/skills/types',
+
+  // 戰鬥相關
+  BATTLE_DAMAGE: '/api/v1/battle/calculate-damage',
+  BATTLE_TYPE_EFFECTIVENESS: '/api/v1/battle/type-effectiveness',
+  BATTLE_TYPE_CHART: '/api/v1/battle/type-chart',
+  BATTLE_TYPES: '/api/v1/battle/types',
 } as const;
 
 // 超時設定（毫秒）

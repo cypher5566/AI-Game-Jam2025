@@ -53,17 +53,6 @@ const StartScreen: React.FC = () => {
     });
   };
 
-  const handleBossTest = () => {
-    // 直接進入 Boss 戰（測試用）
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 500,
-      useNativeDriver: true,
-    }).start(() => {
-      dispatch({ type: 'SET_SCREEN', screen: 'bossBattle' });
-    });
-  };
-
   return (
     <View style={styles.container}>
       {/* 背景漸層效果 */}
@@ -86,11 +75,6 @@ const StartScreen: React.FC = () => {
             <Text style={styles.startButtonText}>開始遊戲</Text>
           </TouchableOpacity>
         </Animated.View>
-
-        {/* Boss 戰測試按鈕 */}
-        <TouchableOpacity style={styles.bossTestButton} onPress={handleBossTest}>
-          <Text style={styles.bossTestButtonText}>🎮 Boss 戰測試</Text>
-        </TouchableOpacity>
 
         {/* 提示文字 */}
         <Text style={styles.hintText}>按下開始鍵開始你的冒險！</Text>
@@ -163,20 +147,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     letterSpacing: 2,
-  },
-  bossTestButton: {
-    backgroundColor: '#4ecca3',
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-    borderRadius: 20,
-    marginTop: 20,
-    borderWidth: 2,
-    borderColor: '#45b393',
-  },
-  bossTestButtonText: {
-    color: '#000',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   hintText: {
     marginTop: 30,

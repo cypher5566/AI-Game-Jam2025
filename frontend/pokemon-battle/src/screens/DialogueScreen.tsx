@@ -13,6 +13,7 @@ import { useGame } from '../contexts/GameContext';
 import { INTRO_DIALOGUES } from '../data/dialogues';
 import PreloadStatus from '../components/PreloadStatus';
 import { useKeyboard } from '../hooks/useKeyboard';
+import ImageUploadScreen from './ImageUploadScreen';
 
 const { width, height } = Dimensions.get('window');
 
@@ -22,6 +23,7 @@ const DialogueScreen: React.FC = () => {
   const [isTyping, setIsTyping] = useState(true);
   const [inputValue, setInputValue] = useState('');
   const [justSetNickname, setJustSetNickname] = useState(false);
+  const [showImageUpload, setShowImageUpload] = useState(false);
   const arrowAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -38,7 +40,12 @@ const DialogueScreen: React.FC = () => {
 
   // 鍵盤控制
   useKeyboard((key) => {
-    // 如果是輸入模式，不處理空白鍵
+    // 如果是圖片上傳模式，不處理鍵盤（由 modal 處理）
+    if (currentDialogue?.requiresImageUpload) {
+      return;
+    }
+
+    // 如果是文字輸入模式，只處理 Enter
     if (currentDialogue?.requiresInput && !isTyping) {
       if (key === 'Enter') {
         handleNext();
@@ -101,6 +108,13 @@ const DialogueScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [state.dialogueIndex, state.pokemonNickname]);
 
+  // 當打字完成且需要圖片上傳時，自動彈出 modal
+  useEffect(() => {
+    if (!isTyping && currentDialogue?.requiresImageUpload && !showImageUpload) {
+      setShowImageUpload(true);
+    }
+  }, [isTyping, currentDialogue, showImageUpload]);
+
   const handleNext = () => {
     if (isTyping) {
       // 如果正在打字，直接顯示全部文字
@@ -108,16 +122,13 @@ const DialogueScreen: React.FC = () => {
       setDisplayedText(fullText);
       setIsTyping(false);
     } else {
-      // 如果需要輸入
-      if (currentDialogue.requiresInput) {
-        // 檢查是否是圖片上傳對話（第4個對話：索引3）
-        if (state.dialogueIndex === 3) {
-          // 跳轉到圖片上傳畫面
-          dispatch({ type: 'SET_SCREEN', screen: 'imageUpload' });
-          return;
-        }
+      // 如果需要圖片上傳（已經由 useEffect 自動彈出，這裡不處理）
+      if (currentDialogue.requiresImageUpload) {
+        return;
+      }
 
-        // 其他輸入（命名）
+      // 如果需要文字輸入（命名）
+      if (currentDialogue.requiresInput) {
         if (inputValue.trim()) {
           // 保存寶可夢暱稱
           dispatch({ type: 'SET_POKEMON_NICKNAME', nickname: inputValue.trim() });
@@ -137,6 +148,13 @@ const DialogueScreen: React.FC = () => {
         dispatch({ type: 'NEXT_DIALOGUE' });
       }
     }
+  };
+
+  // 圖片上傳完成後的回調
+  const handleImageUploadComplete = () => {
+    setShowImageUpload(false);
+    // 立即進入下一段對話（命名）
+    dispatch({ type: 'NEXT_DIALOGUE' });
   };
 
   if (!currentDialogue) {
@@ -173,8 +191,8 @@ const DialogueScreen: React.FC = () => {
           <Text style={styles.dialogueText}>{displayedText}</Text>
         </View>
 
-        {/* 輸入框 (如果需要輸入) */}
-        {!isTyping && currentDialogue.requiresInput && (
+        {/* 輸入框 (只在需要文字輸入時顯示，排除圖片上傳) */}
+        {!isTyping && currentDialogue.requiresInput && !currentDialogue.requiresImageUpload && (
           <View style={styles.inputContainer}>
             <TextInput
               style={styles.input}
@@ -200,8 +218,8 @@ const DialogueScreen: React.FC = () => {
           </View>
         )}
 
-        {/* 繼續指示 (只在不需要輸入時顯示) */}
-        {!isTyping && !currentDialogue.requiresInput && (
+        {/* 繼續指示 (只在一般對話時顯示，排除輸入和圖片上傳) */}
+        {!isTyping && !currentDialogue.requiresInput && !currentDialogue.requiresImageUpload && (
           <>
             <Animated.View
               style={[
@@ -225,8 +243,8 @@ const DialogueScreen: React.FC = () => {
           </>
         )}
 
-        {/* 點擊區域 (輸入模式時禁用) */}
-        {!currentDialogue.requiresInput && (
+        {/* 點擊區域 (只在一般對話時啟用，排除輸入和圖片上傳) */}
+        {!currentDialogue.requiresInput && !currentDialogue.requiresImageUpload && (
           <TouchableOpacity
             style={styles.touchArea}
             onPress={handleNext}
@@ -250,6 +268,11 @@ const DialogueScreen: React.FC = () => {
 
       {/* 背景下載狀態 */}
       <PreloadStatus />
+
+      {/* 圖片上傳彈窗 */}
+      {showImageUpload && (
+        <ImageUploadScreen onComplete={handleImageUploadComplete} />
+      )}
     </View>
   );
 };

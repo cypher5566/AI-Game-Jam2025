@@ -14,8 +14,8 @@ import PreloadStatus from '../components/PreloadStatus';
 import { Pokemon, Skill } from '../types';
 import { musicManager } from '../services/MusicManager';
 import { useTimer } from '../hooks/useCooldown';
-import { PlayerInBattle, generateMockPlayers, simulateMockPlayerChoice } from '../data/mockPlayers';
 import { createBoss } from '../data/bossData';
+import { calculateDamage as apiCalculateDamage } from '../services/battleAPI';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,13 +24,17 @@ const TURN_TIME_LIMIT = 30000; // 30 秒
 const BattleScreen: React.FC = () => {
   const { state, dispatch } = useGame();
 
-  // Boss 狀態 (替代原 enemyPokemon)
-  const [boss, setBoss] = useState<Pokemon>(createBoss('snorlax'));
+  // 敵人狀態（可能是一般敵人或 Boss）
+  const [enemy, setEnemy] = useState<Pokemon>(
+    state.battleState?.enemyPokemon || createBoss('snorlax')
+  );
 
-  // 多玩家狀態
-  const [players, setPlayers] = useState<PlayerInBattle[]>([]);
-  const [currentPlayerId] = useState('player-1');
+  // 玩家寶可夢
+  const [playerPokemon, setPlayerPokemon] = useState<Pokemon>(state.playerPokemon[0]);
+
+  // 玩家選擇狀態
   const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  const [playerHasSelected, setPlayerHasSelected] = useState(false);
 
   // 回合狀態
   const [turnNumber, setTurnNumber] = useState(1);
@@ -58,19 +62,8 @@ const BattleScreen: React.FC = () => {
   // 限時計時器
   const timer = useTimer(TURN_TIME_LIMIT, handleTurnTimeout, false);
 
-  // 初始化玩家
+  // 初始化戰鬥
   useEffect(() => {
-    const mockPlayers = generateMockPlayers(3, false);
-    const realPlayer: PlayerInBattle = {
-      id: currentPlayerId,
-      name: state.pokemonNickname || '玩家',
-      pokemon: state.playerPokemon[0],
-      isOnline: true,
-      hasSelected: false,
-      selectedSkillId: undefined,
-    };
-    setPlayers([realPlayer, ...mockPlayers]);
-
     // 開始進場動畫
     startEntryAnimation();
   }, []);
@@ -149,30 +142,6 @@ const BattleScreen: React.FC = () => {
 
     // 開始倒數計時
     timer.start();
-
-    // 模擬假玩家在隨機時間後選擇
-    simulateMockPlayersChoice();
-  };
-
-  // 模擬假玩家選擇技能
-  const simulateMockPlayersChoice = () => {
-    players.forEach((player) => {
-      if (player.id !== currentPlayerId) {
-        // 假玩家在 5-20 秒之間隨機選擇
-        const delay = 5000 + Math.random() * 15000;
-        setTimeout(() => {
-          if (!timer.isTimeUp && !isProcessing) {
-            const skillId = simulateMockPlayerChoice(player);
-            setPlayers((prev) => prev.map((p) =>
-              p.id === player.id
-                ? { ...p, hasSelected: true, selectedSkillId: skillId }
-                : p
-            ));
-            addLog(`${player.name} 已選擇技能`);
-          }
-        }, delay);
-      }
-    });
   };
 
   // 玩家選擇技能
@@ -180,28 +149,20 @@ const BattleScreen: React.FC = () => {
     if (isProcessing || timer.isTimeUp || selectedSkillId) return;
 
     setSelectedSkillId(skill.id);
-    setPlayers((prev) => prev.map((p) =>
-      p.id === currentPlayerId
-        ? { ...p, hasSelected: true, selectedSkillId: skill.id }
-        : p
-    ));
+    setPlayerHasSelected(true);
 
     addLog(`你選擇了 ${skill.name}`);
 
-    // 檢查是否所有玩家都已選擇
-    const allSelected = players.every((p) =>
-      p.id === currentPlayerId ? true : p.hasSelected
-    );
-
-    if (allSelected) {
-      timer.stop();
-      setTimeout(() => processTurn(), 500);
-    }
+    // 立即停止計時器並進入動作環節
+    timer.stop();
+    setTimeout(() => processTurn(), 500);
   };
 
   // 時間到的回調
   function handleTurnTimeout() {
-    addLog('時間到！開始結算...');
+    if (!playerHasSelected) {
+      addLog('時間到！未選擇技能，跳過本回合...');
+    }
     processTurn();
   }
 
@@ -211,56 +172,51 @@ const BattleScreen: React.FC = () => {
     setIsProcessing(true);
 
     setTimeout(() => {
-      // 收集所有已選擇的玩家攻擊
-      const attacks: { player: PlayerInBattle; skill: Skill }[] = [];
-
-      players.forEach((player) => {
-        if (player.hasSelected && player.selectedSkillId) {
-          const skill = player.pokemon.skills.find((s) => s.id === player.selectedSkillId);
-          if (skill) {
-            attacks.push({ player, skill });
-          }
+      // 如果玩家已選擇，執行玩家攻擊
+      if (playerHasSelected && selectedSkillId) {
+        const skill = playerPokemon.skills.find((s) => s.id === selectedSkillId);
+        if (skill) {
+          executePlayerAttack(skill);
         } else {
-          addLog(`${player.name} 未選擇，跳過`);
+          // 玩家未攻擊，直接進入敵人回合
+          enemyCounterAttack();
         }
-      });
-
-      // 執行所有攻擊
-      executeAttacks(attacks);
+      } else {
+        // 玩家未選擇，直接進入敵人回合
+        addLog('你未選擇技能，跳過攻擊');
+        enemyCounterAttack();
+      }
     }, 1000);
   };
 
-  // 執行所有攻擊
-  const executeAttacks = (attacks: { player: PlayerInBattle; skill: Skill }[]) => {
-    if (attacks.length === 0) {
-      // 沒有人攻擊,直接 Boss 反擊
-      setTimeout(() => bossCounterAttack(), 1000);
-      return;
-    }
+  // 執行玩家攻擊
+  const executePlayerAttack = async (skill: Skill) => {
+    addLog(`你使用 ${skill.name}！`);
 
-    let totalDamage = 0;
-    let attackIndex = 0;
+    // 播放攻擊動畫
+    setIsPlayerAttacking(true);
+    setTimeout(() => setIsPlayerAttacking(false), 400);
 
-    const executeNextAttack = () => {
-      if (attackIndex >= attacks.length) {
-        // 所有攻擊結束,更新 Boss HP
-        finalizeDamage(totalDamage);
-        return;
-      }
+    setTimeout(async () => {
+      try {
+        // 調用 Battle API 計算傷害
+        const damageResult = await apiCalculateDamage({
+          attacker_level: playerPokemon.level,
+          attacker_attack: playerPokemon.attack,
+          defender_defense: enemy.defense,
+          skill_power: skill.power,
+          skill_type: skill.type,
+          defender_type: enemy.type,
+          is_critical: Math.random() < 0.0625, // 6.25% 會心率
+        });
 
-      const { player, skill } = attacks[attackIndex];
-      const damage = calculateDamage(player.pokemon, boss, skill);
-      totalDamage += damage;
+        const damage = damageResult.damage;
 
-      addLog(`${player.name} 使用 ${skill.name}！`);
+        // 顯示效果訊息
+        if (damageResult.message && damageResult.message !== '造成傷害') {
+          addLog(damageResult.message);
+        }
 
-      // 播放攻擊動畫
-      if (player.id === currentPlayerId) {
-        setIsPlayerAttacking(true);
-        setTimeout(() => setIsPlayerAttacking(false), 400);
-      }
-
-      setTimeout(() => {
         setIsEnemyTakingDamage(true);
         showDamage(damage, 'enemy');
         musicManager.playHitSound();
@@ -281,116 +237,157 @@ const BattleScreen: React.FC = () => {
 
         setTimeout(() => setIsEnemyTakingDamage(false), 200);
 
-        attackIndex++;
-        setTimeout(() => executeNextAttack(), 800);
-      }, 400);
-    };
+        // 更新敵人 HP
+        const newHp = Math.max(0, enemy.currentHp - damage);
+        setEnemy((prev) => ({ ...prev, currentHp: newHp }));
 
-    executeNextAttack();
-  };
+        addLog(`造成 ${damage} 傷害！`);
 
-  // 最終更新 Boss HP
-  const finalizeDamage = (totalDamage: number) => {
-    const newHp = Math.max(0, boss.currentHp - totalDamage);
-    setBoss((prev) => ({ ...prev, currentHp: newHp }));
+        // 檢查勝利條件
+        if (newHp <= 0) {
+          setTimeout(() => {
+            addLog('🎉 敵人被擊敗了！');
+            addLog('你獲勝了！');
+            setTimeout(() => {
+              dispatch({ type: 'END_BATTLE', result: 'win' });
+            }, 3000);
+          }, 1000);
+          return;
+        }
 
-    addLog(`Boss 受到總計 ${totalDamage} 傷害！`);
+        // 敵人反擊
+        setTimeout(() => enemyCounterAttack(), 1500);
 
-    // 檢查勝利條件
-    if (newHp <= 0) {
-      setTimeout(() => {
-        addLog('🎉 Boss 被擊敗了！');
-        addLog('你們獲勝了！');
+      } catch (error) {
+        console.error('Battle API 調用失敗:', error);
+        addLog('⚠️ 傷害計算異常，使用備用計算');
+
+        // 使用本地計算作為備用
+        const damage = calculateDamageLocal(playerPokemon, enemy, skill);
+        setIsEnemyTakingDamage(true);
+        showDamage(damage, 'enemy');
+
         setTimeout(() => {
-          dispatch({ type: 'END_BATTLE', result: 'win' });
-        }, 3000);
-      }, 1000);
-      return;
-    }
+          setIsEnemyTakingDamage(false);
+          const newHp = Math.max(0, enemy.currentHp - damage);
+          setEnemy((prev) => ({ ...prev, currentHp: newHp }));
 
-    // Boss 反擊
-    setTimeout(() => bossCounterAttack(), 1500);
+          if (newHp <= 0) {
+            setTimeout(() => {
+              dispatch({ type: 'END_BATTLE', result: 'win' });
+            }, 2000);
+          } else {
+            setTimeout(() => enemyCounterAttack(), 1500);
+          }
+        }, 500);
+      }
+    }, 400);
   };
 
-  // Boss 反擊
-  const bossCounterAttack = () => {
-    const bossSkill = boss.skills[Math.floor(Math.random() * boss.skills.length)];
-    const alivePlayers = players.filter((p) => p.pokemon.currentHp > 0);
+  // 敵人反擊
+  const enemyCounterAttack = async () => {
+    const enemySkill = enemy.skills[Math.floor(Math.random() * enemy.skills.length)];
 
-    if (alivePlayers.length === 0) {
-      // 所有玩家都死了
-      addLog('💀 全員陣亡！');
+    if (playerPokemon.currentHp <= 0) {
+      addLog('💀 你的寶可夢已無法戰鬥！');
       setTimeout(() => {
         dispatch({ type: 'END_BATTLE', result: 'lose' });
       }, 2000);
       return;
     }
 
-    const target = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
-    const damage = calculateDamage(boss, target.pokemon, bossSkill);
+    addLog(`\n${enemy.name} 使用 ${enemySkill.name}！`);
 
-    addLog(`\nBoss 使用 ${bossSkill.name}！`);
-    addLog(`攻擊 ${target.name}，造成 ${damage} 傷害！`);
-
-    // Boss 攻擊動畫
+    // 敵人攻擊動畫
     setIsEnemyAttacking(true);
     setTimeout(() => setIsEnemyAttacking(false), 400);
 
-    setTimeout(() => {
-      if (target.id === currentPlayerId) {
+    setTimeout(async () => {
+      try {
+        // 調用 Battle API 計算敵人傷害
+        const damageResult = await apiCalculateDamage({
+          attacker_level: enemy.level,
+          attacker_attack: enemy.attack,
+          defender_defense: playerPokemon.defense,
+          skill_power: enemySkill.power,
+          skill_type: enemySkill.type,
+          defender_type: playerPokemon.type,
+          is_critical: Math.random() < 0.0625,
+        });
+
+        const damage = damageResult.damage;
+
+        addLog(`造成 ${damage} 傷害！`);
+        if (damageResult.message && damageResult.message !== '造成傷害') {
+          addLog(damageResult.message);
+        }
+
         setIsPlayerTakingDamage(true);
         showDamage(damage, 'player');
         setTimeout(() => setIsPlayerTakingDamage(false), 200);
+
+        musicManager.playHitSound();
+
+        // 背景閃爍
+        Animated.sequence([
+          Animated.timing(bgFlashAnim, {
+            toValue: 1,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+          Animated.timing(bgFlashAnim, {
+            toValue: 0,
+            duration: 100,
+            useNativeDriver: true,
+          }),
+        ]).start();
+
+        // 更新玩家 HP
+        const newHp = Math.max(0, playerPokemon.currentHp - damage);
+        setPlayerPokemon((prev) => ({ ...prev, currentHp: newHp }));
+
+        // 檢查失敗條件
+        setTimeout(() => {
+          if (newHp <= 0) {
+            addLog('💀 你的寶可夢無法戰鬥了！');
+            setTimeout(() => {
+              dispatch({ type: 'END_BATTLE', result: 'lose' });
+            }, 2000);
+            return;
+          }
+
+          // 開始下一回合
+          setTurnNumber((prev) => prev + 1);
+          setPlayerHasSelected(false);
+          setTimeout(() => startNewTurn(), 2000);
+        }, 1000);
+
+      } catch (error) {
+        console.error('敵人攻擊 API 失敗:', error);
+        // 使用本地計算
+        const damage = calculateDamageLocal(enemy, playerPokemon, enemySkill);
+        showDamage(damage, 'player');
+
+        setTimeout(() => {
+          const newHp = Math.max(0, playerPokemon.currentHp - damage);
+          setPlayerPokemon((prev) => ({ ...prev, currentHp: newHp }));
+
+          if (newHp <= 0) {
+            setTimeout(() => {
+              dispatch({ type: 'END_BATTLE', result: 'lose' });
+            }, 2000);
+          } else {
+            setTurnNumber((prev) => prev + 1);
+            setPlayerHasSelected(false);
+            setTimeout(() => startNewTurn(), 2000);
+          }
+        }, 1000);
       }
-
-      musicManager.playHitSound();
-
-      // 背景閃爍
-      Animated.sequence([
-        Animated.timing(bgFlashAnim, {
-          toValue: 1,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-        Animated.timing(bgFlashAnim, {
-          toValue: 0,
-          duration: 100,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      // 更新玩家 HP
-      setPlayers((prev) => prev.map((p) => {
-        if (p.id === target.id) {
-          const newHp = Math.max(0, p.pokemon.currentHp - damage);
-          return {
-            ...p,
-            pokemon: { ...p.pokemon, currentHp: newHp },
-          };
-        }
-        return p;
-      }));
-
-      // 檢查失敗條件
-      setTimeout(() => {
-        const allDead = players.every((p) => p.pokemon.currentHp <= 0);
-        if (allDead) {
-          addLog('💀 全員陣亡！');
-          setTimeout(() => {
-            dispatch({ type: 'END_BATTLE', result: 'lose' });
-          }, 2000);
-          return;
-        }
-
-        // 開始下一回合
-        setTurnNumber((prev) => prev + 1);
-        setTimeout(() => startNewTurn(), 2000);
-      }, 1000);
     }, 600);
   };
 
-  // 計算傷害
-  const calculateDamage = (attacker: Pokemon, defender: Pokemon, skill: Skill): number => {
+  // 本地傷害計算（備用）
+  const calculateDamageLocal = (attacker: Pokemon, defender: Pokemon, skill: Skill): number => {
     const baseDamage = Math.floor(
       ((2 * attacker.level / 5 + 2) * skill.power * attacker.attack) /
         (defender.defense * 50) +
@@ -424,9 +421,6 @@ const BattleScreen: React.FC = () => {
     });
   };
 
-  // 獲取當前玩家
-  const currentPlayer = players.find((p) => p.id === currentPlayerId);
-
   // 計時器顏色
   const getTimerColor = () => {
     const seconds = Math.ceil(timer.remaining / 1000);
@@ -434,8 +428,6 @@ const BattleScreen: React.FC = () => {
     if (seconds > 5) return '#ff9800';
     return '#f44336';
   };
-
-  if (!currentPlayer) return null;
 
   return (
     <View style={styles.container}>
@@ -477,7 +469,7 @@ const BattleScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 敵方 Boss */}
+      {/* 敵方 */}
       <Animated.View
         style={[
           styles.enemySection,
@@ -487,13 +479,13 @@ const BattleScreen: React.FC = () => {
         ]}
       >
         <View style={styles.pokemonInfo}>
-          <Text style={styles.pokemonName}>{boss.name}</Text>
-          <Text style={styles.level}>Lv.{boss.level}</Text>
-          <HPBar currentHp={boss.currentHp} maxHp={boss.maxHp} />
+          <Text style={styles.pokemonName}>{enemy.name}</Text>
+          <Text style={styles.level}>Lv.{enemy.level}</Text>
+          <HPBar currentHp={enemy.currentHp} maxHp={enemy.maxHp} />
         </View>
         <View style={styles.enemyPokemonContainer}>
           <PokemonSprite
-            pokemon={boss}
+            pokemon={enemy}
             isEnemy
             isAttacking={isEnemyAttacking}
             isTakingDamage={isEnemyTakingDamage}
@@ -533,7 +525,7 @@ const BattleScreen: React.FC = () => {
       >
         <View style={styles.playerPokemonContainer}>
           <PokemonSprite
-            pokemon={currentPlayer.pokemon}
+            pokemon={playerPokemon}
             isAttacking={isPlayerAttacking}
             isTakingDamage={isPlayerTakingDamage}
           />
@@ -560,9 +552,9 @@ const BattleScreen: React.FC = () => {
           )}
         </View>
         <View style={styles.pokemonInfo}>
-          <Text style={styles.pokemonName}>{currentPlayer.pokemon.name}</Text>
-          <Text style={styles.level}>Lv.{currentPlayer.pokemon.level}</Text>
-          <HPBar currentHp={currentPlayer.pokemon.currentHp} maxHp={currentPlayer.pokemon.maxHp} />
+          <Text style={styles.pokemonName}>{playerPokemon.name}</Text>
+          <Text style={styles.level}>Lv.{playerPokemon.level}</Text>
+          <HPBar currentHp={playerPokemon.currentHp} maxHp={playerPokemon.maxHp} />
         </View>
       </Animated.View>
 
@@ -579,10 +571,10 @@ const BattleScreen: React.FC = () => {
       {battleStarted && !isProcessing && (
         <View style={styles.skillMenu}>
           <Text style={styles.menuTitle}>
-            {timer.isTimeUp ? '時間到！' : selectedSkillId ? '已選擇技能，等待其他玩家...' : '選擇你的技能'}
+            {timer.isTimeUp ? '時間到！' : selectedSkillId ? '已選擇技能！' : '選擇你的技能'}
           </Text>
           <View style={styles.skillGrid}>
-            {currentPlayer.pokemon.skills.map((skill) => (
+            {playerPokemon.skills.map((skill) => (
               <TouchableOpacity
                 key={skill.id}
                 style={[

@@ -50,7 +50,8 @@ export interface DialogueMessage {
   speaker: string;
   text: string;
   avatar?: string;
-  requiresInput?: boolean;  // 是否需要玩家輸入
+  requiresInput?: boolean;  // 是否需要玩家輸入（文字）
+  requiresImageUpload?: boolean;  // 是否需要圖片上傳
 }
 
 export interface GameState {

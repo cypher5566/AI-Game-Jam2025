@@ -213,18 +213,47 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
 
     case 'SET_POKEMON_IMAGES':
-      // 儲存 AI 生成的前後圖片
+      // 儲存 AI 生成的前後圖片，並立即應用到玩家寶可夢
+      const updatedPokemonWithImages = state.playerPokemon.map((pokemon, index) => {
+        if (index === 0) {
+          // 更新第一隻寶可夢的圖片（base64 data URI 格式）
+          return {
+            ...pokemon,
+            frontSprite: action.frontImage,  // data:image/png;base64,...
+            backSprite: action.backImage,    // data:image/png;base64,...
+          };
+        }
+        return pokemon;
+      });
+
+      console.log('[GameContext] 已更新玩家寶可夢圖片');
+
       return {
         ...state,
         uploadedFrontImage: action.frontImage,
         uploadedBackImage: action.backImage,
+        playerPokemon: updatedPokemonWithImages,
       };
 
     case 'SET_AI_TYPE':
-      // 儲存 AI 判定的屬性
+      // 儲存 AI 判定的屬性，並更新玩家寶可夢的屬性
+      const updatedPokemonWithType = state.playerPokemon.map((pokemon, index) => {
+        if (index === 0) {
+          // 更新第一隻寶可夢的屬性
+          return {
+            ...pokemon,
+            type: action.pokemonType as any,
+          };
+        }
+        return pokemon;
+      });
+
+      console.log('[GameContext] 已更新玩家寶可夢屬性:', action.pokemonType);
+
       return {
         ...state,
         aiDeterminedType: action.pokemonType,
+        playerPokemon: updatedPokemonWithType,
       };
 
     // 對話相關

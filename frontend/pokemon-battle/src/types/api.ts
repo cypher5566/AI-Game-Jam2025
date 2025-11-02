@@ -81,3 +81,38 @@ export type UploadProgressCallback = (progress: number) => void;
  * 處理狀態回調
  */
 export type ProcessStatusCallback = (status: 'processing' | 'completed' | 'failed') => void;
+
+// ==================== Battle 戰鬥相關 ====================
+
+/**
+ * 戰鬥傷害計算請求
+ */
+export interface BattleDamageRequest {
+  attacker_level: number;        // 攻擊方等級 (1-100)
+  attacker_attack: number;       // 攻擊力值
+  defender_defense: number;      // 防禦力值
+  skill_power: number;           // 技能威力 (>= 0)
+  skill_type: string;            // 技能屬性
+  defender_type: string;         // 防禦方屬性
+  is_critical?: boolean;         // 是否會心一擊（可選）
+}
+
+/**
+ * 戰鬥傷害計算回應
+ */
+export interface BattleDamageResponse {
+  damage: number;                // 計算出的傷害值
+  type_effectiveness: number;    // 屬性相剋倍率
+  is_critical: boolean;          // 是否會心一擊
+  message: string;               // 效果訊息（如「效果絕佳！」）
+}
+
+/**
+ * 屬性相剋查詢回應
+ */
+export interface TypeEffectivenessResponse {
+  attack_type: string;           // 攻擊屬性
+  defense_type: string;          // 防禦屬性
+  effectiveness: number;         // 倍率值 (0, 0.25, 0.5, 1, 2, 4)
+  message: string;               // 相剋說明
+}

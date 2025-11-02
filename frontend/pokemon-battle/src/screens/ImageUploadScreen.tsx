@@ -5,11 +5,15 @@ import { useGame } from '../contexts/GameContext';
 import { uploadPokemonImage, pollProcessStatus, validateImageFile } from '../services/pokemonAPI';
 import { TYPE_EN_TO_ZH } from '../services/apiConfig';
 
+interface ImageUploadScreenProps {
+  onComplete?: () => void;
+}
+
 /**
  * 圖片上傳畫面（彈窗式介面）
  * 整合後端 API 進行圖片上傳和 AI 處理
  */
-const ImageUploadScreen: React.FC = () => {
+const ImageUploadScreen: React.FC<ImageUploadScreenProps> = ({ onComplete }) => {
   const { dispatch } = useGame();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(true);
@@ -74,40 +78,41 @@ const ImageUploadScreen: React.FC = () => {
   // 跳過上傳，使用預設寶可夢
   const handleSkip = () => {
     setModalVisible(false);
-    // 繼續到命名對話
+    // 立即調用完成回調
     setTimeout(() => {
-      dispatch({ type: 'SKIP_IMAGE_UPLOAD' });
+      onComplete?.();
     }, 300);
   };
 
-  // 確認上傳
+  // 確認上傳（背景處理）
   const handleConfirm = async () => {
     if (!selectedImage) {
       Alert.alert('提示', '請先選擇圖片，或點擊「跳過」使用預設寶可夢');
       return;
     }
 
-    setUploading(true);
-    setStatusMessage('正在上傳圖片...');
+    // 立即關閉彈窗並進入下一段對話
+    setModalVisible(false);
+    setTimeout(() => {
+      onComplete?.();
+    }, 300);
+
+    // 在背景處理圖片上傳
+    console.log('[ImageUpload] 開始背景上傳圖片');
 
     try {
       // 步驟 1: 上傳圖片
-      console.log('[ImageUpload] 開始上傳圖片');
       const uploadId = await uploadPokemonImage(selectedImage);
-      console.log('[ImageUpload] 上傳成功，ID:', uploadId);
+      console.log('[ImageUpload] 背景上傳成功，ID:', uploadId);
 
-      // 步驟 2: 輪詢處理狀態
-      setUploading(false);
-      setProcessing(true);
-      setStatusMessage('AI 正在處理圖片...');
-
+      // 步驟 2: 輪詢處理狀態（在背景執行）
       const result = await pollProcessStatus(uploadId, (status, attempt) => {
-        setStatusMessage(`AI 處理中... (${attempt}/30)`);
+        console.log(`[ImageUpload] 背景處理中... (${attempt}/30)`);
       });
 
-      console.log('[ImageUpload] 處理完成:', result);
+      console.log('[ImageUpload] 背景處理完成:', result);
 
-      // 步驟 3: 檢查結果
+      // 步驟 3: 儲存結果
       if (result.status === 'completed' && result.data) {
         const { front_image, back_image, type, type_chinese } = result.data;
 
@@ -125,36 +130,14 @@ const ImageUploadScreen: React.FC = () => {
           pokemonType: type,
         });
 
-        // 顯示成功訊息
-        setStatusMessage(`成功！屬性：${type_chinese}`);
-
-        // 等待一下讓用戶看到結果
-        setTimeout(() => {
-          setModalVisible(false);
-          setTimeout(() => {
-            dispatch({ type: 'SKIP_IMAGE_UPLOAD' });
-          }, 300);
-        }, 1500);
-
+        console.log('[ImageUpload] 背景處理完成，已儲存到 GameContext');
       } else {
-        throw new Error('處理結果無效');
+        console.error('[ImageUpload] 背景處理失敗：結果無效');
       }
 
     } catch (error) {
-      console.error('[ImageUpload] 失敗:', error);
-      setUploading(false);
-      setProcessing(false);
-      setStatusMessage('');
-
-      // 顯示錯誤並提供選項
-      Alert.alert(
-        '上傳失敗',
-        error instanceof Error ? error.message : '圖片處理失敗',
-        [
-          { text: '重試', onPress: handleConfirm },
-          { text: '使用預設', onPress: handleSkip },
-        ]
-      );
+      console.error('[ImageUpload] 背景上傳/處理失敗:', error);
+      // 背景失敗不影響流程，使用預設值
     }
   };
 
@@ -189,31 +172,20 @@ const ImageUploadScreen: React.FC = () => {
             {selectedImage ? (
               <View style={styles.imagePreview}>
                 <Image source={{ uri: selectedImage }} style={styles.previewImage} />
-                {!uploading && !processing && (
-                  <TouchableOpacity
-                    style={styles.changeButton}
-                    onPress={handleSelectImage}
-                  >
-                    <Text style={styles.changeButtonText}>更換圖片</Text>
-                  </TouchableOpacity>
-                )}
+                <TouchableOpacity
+                  style={styles.changeButton}
+                  onPress={handleSelectImage}
+                >
+                  <Text style={styles.changeButtonText}>更換圖片</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <TouchableOpacity
                 style={styles.selectButton}
                 onPress={handleSelectImage}
-                disabled={uploading || processing}
               >
                 <Text style={styles.selectButtonText}>📷 選擇圖片</Text>
               </TouchableOpacity>
-            )}
-
-            {/* 處理狀態顯示 */}
-            {(uploading || processing) && (
-              <View style={styles.statusContainer}>
-                <ActivityIndicator size="large" color="#4ecca3" />
-                <Text style={styles.statusText}>{statusMessage}</Text>
-              </View>
             )}
           </View>
 
@@ -222,7 +194,7 @@ const ImageUploadScreen: React.FC = () => {
             <Text style={styles.infoTitle}>💡 上傳說明</Text>
             <Text style={styles.infoText}>• 建議上傳清晰的寶可夢圖片</Text>
             <Text style={styles.infoText}>• AI 會自動判定屬性（火、水、電、普通）</Text>
-            <Text style={styles.infoText}>• 圖片將用於生成專屬的像素化寶可夢</Text>
+            <Text style={styles.infoText}>• 上傳後會在背景處理，不影響遊戲流程</Text>
           </View>
 
           {/* 按鈕區 */}
@@ -230,7 +202,6 @@ const ImageUploadScreen: React.FC = () => {
             <TouchableOpacity
               style={[styles.button, styles.skipButton]}
               onPress={handleSkip}
-              disabled={uploading || processing}
             >
               <Text style={styles.skipButtonText}>跳過（使用預設）</Text>
             </TouchableOpacity>
@@ -239,19 +210,13 @@ const ImageUploadScreen: React.FC = () => {
               style={[
                 styles.button,
                 styles.confirmButton,
-                (!selectedImage || uploading || processing) && styles.buttonDisabled,
+                !selectedImage && styles.buttonDisabled,
               ]}
               onPress={handleConfirm}
-              disabled={!selectedImage || uploading || processing}
+              disabled={!selectedImage}
             >
               <Text style={styles.confirmButtonText}>
-                {uploading
-                  ? '上傳中...'
-                  : processing
-                  ? '處理中...'
-                  : selectedImage
-                  ? '確認上傳'
-                  : '請先選擇圖片'}
+                {selectedImage ? '確認上傳' : '請先選擇圖片'}
               </Text>
             </TouchableOpacity>
           </View>
