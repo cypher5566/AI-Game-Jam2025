@@ -11,6 +11,10 @@
   ],
   "routes": [
     {
+      "src": "/_expo/(.*)",
+      "dest": "/_expo/$1"
+    },
+    {
       "src": "/static/(.*)",
       "dest": "/static/$1"
     },
