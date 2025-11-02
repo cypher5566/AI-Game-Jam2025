@@ -1,6 +1,6 @@
 # FastAPI 核心
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
+fastapi>=0.110.0  # 升級以支援 anyio 4.x（google-genai 需要）
+uvicorn[standard]>=0.27.0  # 升級以支援 anyio 4.x
 python-multipart==0.0.6
 
 # 圖片處理
@@ -20,7 +20,7 @@ google-auth-oauthlib==1.1.0
 google-auth-httplib2==0.1.1
 
 # WebSocket
-websockets==12.0
+websockets>=13.0  # 升級以支援 google-genai
 
 # 資料驗證
 pydantic==2.5.0
