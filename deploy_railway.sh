@@ -47,17 +47,22 @@ echo "正在設定環境變數..."
 
 # 從 .env 讀取並設定
 if [ -f ".env" ]; then
-    railway variables set SUPABASE_URL="$(grep SUPABASE_URL .env | cut -d '=' -f2)"
-    railway variables set SUPABASE_KEY="$(grep SUPABASE_KEY .env | cut -d '=' -f2)"
-    railway variables set SUPABASE_SERVICE_KEY="$(grep SUPABASE_SERVICE_KEY .env | cut -d '=' -f2)"
-    railway variables set GEMINI_API_KEY="$(grep GEMINI_API_KEY .env | cut -d '=' -f2)"
-    railway variables set ENVIRONMENT=production
-    railway variables set HOST=0.0.0.0
-    railway variables set PORT=\$PORT
+    SUPABASE_URL=$(grep SUPABASE_URL .env | cut -d '=' -f2)
+    SUPABASE_KEY=$(grep SUPABASE_KEY .env | cut -d '=' -f2)
+    SUPABASE_SERVICE_KEY=$(grep SUPABASE_SERVICE_KEY .env | cut -d '=' -f2)
+    GEMINI_API_KEY=$(grep GEMINI_API_KEY .env | cut -d '=' -f2)
+
+    railway variables --set "SUPABASE_URL=$SUPABASE_URL"
+    railway variables --set "SUPABASE_KEY=$SUPABASE_KEY"
+    railway variables --set "SUPABASE_SERVICE_KEY=$SUPABASE_SERVICE_KEY"
+    railway variables --set "GEMINI_API_KEY=$GEMINI_API_KEY"
+    railway variables --set "ENVIRONMENT=production"
+    railway variables --set "HOST=0.0.0.0"
+    railway variables --set "PORT=\$PORT"
 
     # 生成隨機 SECRET_KEY
     SECRET_KEY=$(openssl rand -base64 32)
-    railway variables set SECRET_KEY="$SECRET_KEY"
+    railway variables --set "SECRET_KEY=$SECRET_KEY"
 
     echo "✅ 環境變數設定完成"
 else

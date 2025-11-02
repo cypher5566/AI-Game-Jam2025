@@ -76,7 +76,7 @@ echo ""
 
 cd backend
 echo "正在更新 Railway ALLOWED_ORIGINS..."
-railway variables set ALLOWED_ORIGINS="$VERCEL_URL"
+railway variables --set "ALLOWED_ORIGINS=$VERCEL_URL"
 
 echo ""
 echo "✅ CORS 設定更新完成！"

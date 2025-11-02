@@ -63,3 +63,4 @@ htmlcov/
 
 # Documentation
 docs/_build/
+ENV_VARS.txt

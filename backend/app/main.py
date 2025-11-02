@@ -145,12 +145,13 @@ async def global_exception_handler(request, exc):
 
 # ===== 路由註冊 =====
 from app.routers import pokemon_router, battle_router, rooms_router
-from app.routers import skills
+from app.routers import skills, ai_usage
 
 app.include_router(pokemon_router, prefix="/api/v1/pokemon", tags=["Pokemon"])
 app.include_router(skills.router, prefix="/api/v1/skills", tags=["Skills"])
 app.include_router(battle_router, prefix="/api/v1/battle", tags=["Battle"])
 app.include_router(rooms_router, prefix="/api/v1/rooms", tags=["Rooms"])
+app.include_router(ai_usage.router, tags=["AI Usage"])
 
 
 # ===== 應用程式啟動 =====

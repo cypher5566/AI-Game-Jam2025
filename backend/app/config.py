@@ -63,6 +63,11 @@ class Settings(BaseSettings):
     secret_key: str = Field(..., env="SECRET_KEY")
     algorithm: str = Field(default="HS256", env="ALGORITHM")
 
+    # Gemini AI 用量限制（防止超支）
+    max_daily_ai_generations: int = Field(default=100, env="MAX_DAILY_AI_GENERATIONS")  # 每日最多 AI 生成次數
+    max_monthly_budget_usd: float = Field(default=10.0, env="MAX_MONTHLY_BUDGET_USD")  # 每月預算（美金）
+    enable_ai_generation: bool = Field(default=True, env="ENABLE_AI_GENERATION")  # 是否啟用 AI 生成（False 則只用 fallback）
+
     # 18種寶可夢屬性
     POKEMON_TYPES: ClassVar[List[str]] = [
         "normal", "fire", "water", "electric", "grass", "ice",

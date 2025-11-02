@@ -14,8 +14,10 @@ import io
 import logging
 from typing import Optional
 import os
+from datetime import date
 
 from app.config import settings
+from app.database import get_service_db
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +46,101 @@ class GeminiService:
         except Exception as e:
             logger.error(f"❌ Gemini API 初始化失敗: {e}")
             raise
+
+    def _check_daily_quota(self) -> bool:
+        """
+        檢查今日 AI 生成次數是否超過限額
+
+        Returns:
+            True 如果在限額內，False 如果超過限額
+        """
+        try:
+            # 如果停用 AI 生成，直接返回 False
+            if not settings.enable_ai_generation:
+                logger.info("⚠️  AI 生成已停用（配置文件設定）")
+                return False
+
+            today = date.today().isoformat()
+            supabase = get_service_db()
+
+            # 查詢今日使用量
+            result = supabase.table("ai_usage_tracking").select("*").eq("date", today).execute()
+
+            if result.data and len(result.data) > 0:
+                usage = result.data[0]
+                current_count = usage["ai_generations_count"]
+
+                # 檢查是否超過每日限額
+                if current_count >= settings.max_daily_ai_generations:
+                    logger.warning(f"⚠️  已達到每日 AI 生成限額: {current_count}/{settings.max_daily_ai_generations}")
+                    logger.warning(f"   預估成本: ${usage['estimated_cost_usd']:.2f} USD")
+                    return False
+
+                logger.info(f"📊 今日 AI 使用量: {current_count}/{settings.max_daily_ai_generations}")
+                return True
+            else:
+                # 如果今天沒有記錄，創建一筆
+                supabase.table("ai_usage_tracking").insert({
+                    "date": today,
+                    "ai_generations_count": 0,
+                    "estimated_cost_usd": 0.0
+                }).execute()
+                return True
+
+        except Exception as e:
+            logger.error(f"❌ 檢查用量限額失敗: {e}")
+            # 錯誤時保守處理：允許繼續（但會記錄錯誤）
+            return True
+
+    def _record_ai_usage(self, cost_usd: float = 0.039):
+        """
+        記錄 AI 使用量
+
+        Args:
+            cost_usd: 單次生成成本（美金），預設 $0.039
+        """
+        try:
+            today = date.today().isoformat()
+            supabase = get_service_db()
+
+            # 使用 PostgreSQL 的 UPSERT 語法更新計數
+            supabase.rpc(
+                "increment_ai_usage",
+                {
+                    "usage_date": today,
+                    "increment_count": 1,
+                    "increment_cost": cost_usd
+                }
+            ).execute()
+
+            logger.info(f"💰 記錄 AI 使用: +1 次，成本 ${cost_usd:.4f} USD")
+
+        except Exception as e:
+            # 使用 fallback 方法
+            try:
+                supabase = get_service_db()
+                result = supabase.table("ai_usage_tracking").select("*").eq("date", today).execute()
+
+                if result.data and len(result.data) > 0:
+                    usage = result.data[0]
+                    new_count = usage["ai_generations_count"] + 1
+                    new_cost = float(usage["estimated_cost_usd"]) + cost_usd
+
+                    supabase.table("ai_usage_tracking").update({
+                        "ai_generations_count": new_count,
+                        "estimated_cost_usd": new_cost,
+                        "updated_at": "NOW()"
+                    }).eq("date", today).execute()
+                else:
+                    supabase.table("ai_usage_tracking").insert({
+                        "date": today,
+                        "ai_generations_count": 1,
+                        "estimated_cost_usd": cost_usd
+                    }).execute()
+
+            except Exception as inner_e:
+                logger.error(f"❌ 記錄 AI 使用量失敗: {inner_e}")
+                # 即使記錄失敗也不影響主流程
 
     async def detect_pokemon_type(self, image_bytes: bytes) -> str:
         """
@@ -128,10 +225,17 @@ class GeminiService:
             背面圖片 bytes，如果失敗返回 None
 
         實作方式:
-            1. 使用 Gemini 2.5 Flash Image 進行圖片生成
-            2. Prompt 要求生成背面視角
-            3. 保持像素風格
+            1. 檢查每日用量限額
+            2. 使用 Gemini 2.5 Flash Image 進行圖片生成
+            3. Prompt 要求生成背面視角
+            4. 保持像素風格
+            5. 記錄 AI 使用量
         """
+        # 檢查是否超過每日限額
+        if not self._check_daily_quota():
+            logger.warning("⚠️  超過每日 AI 生成限額，使用 fallback 機制")
+            return None
+
         try:
             # 載入正面圖片
             front_image = Image.open(io.BytesIO(front_image_bytes))
@@ -178,9 +282,12 @@ Important: This is a back sprite for a pokemon game, similar to Pokemon games wh
                     logger.info("✅ AI 背面圖片生成成功")
                     logger.debug(f"   圖片大小: {len(generated_image_bytes)} bytes")
 
+                    # 記錄 AI 使用量（成功生成才記錄）
+                    self._record_ai_usage(cost_usd=0.039)
+
                     return generated_image_bytes
 
-            # 如果沒有找到圖片數據
+            # 如果沒有找到圖片數據（不記錄用量）
             logger.warning("⚠️  API 返回成功但沒有圖片數據")
             return None
 
