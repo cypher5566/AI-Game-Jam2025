@@ -62,6 +62,7 @@ export interface GameState {
   dialogueIndex: number;
   hasSeenIntro: boolean;
   pokemonNickname?: string;  // 玩家的寶可夢暱稱
+  pokemonId?: string;  // 後端創建的 Pokemon ID (用於 WebSocket 連線)
   // 圖片上傳相關
   uploadedImage?: string;  // 上傳的圖片（base64 或 URL）
   pokemonType?: PokemonType;  // Server 返回的寶可夢屬性

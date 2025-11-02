@@ -14,6 +14,7 @@ import { INTRO_DIALOGUES } from '../data/dialogues';
 import PreloadStatus from '../components/PreloadStatus';
 import { useKeyboard } from '../hooks/useKeyboard';
 import ImageUploadScreen from './ImageUploadScreen';
+import { createPokemonRecord } from '../services/pokemonAPI';
 
 const { width, height } = Dimensions.get('window');
 
@@ -130,10 +131,15 @@ const DialogueScreen: React.FC = () => {
       // 如果需要文字輸入（命名）
       if (currentDialogue.requiresInput) {
         if (inputValue.trim()) {
+          const nickname = inputValue.trim();
+
           // 保存寶可夢暱稱
-          dispatch({ type: 'SET_POKEMON_NICKNAME', nickname: inputValue.trim() });
+          dispatch({ type: 'SET_POKEMON_NICKNAME', nickname });
           setInputValue('');
           setJustSetNickname(true);  // 標記已設定暱稱，觸發 useEffect 進入下一個對話
+
+          // 在背景調用 create Pokemon API
+          createPokemonInBackground(nickname);
         }
         return;
       }
@@ -155,6 +161,39 @@ const DialogueScreen: React.FC = () => {
     setShowImageUpload(false);
     // 立即進入下一段對話（命名）
     dispatch({ type: 'NEXT_DIALOGUE' });
+  };
+
+  // 在背景調用 create Pokemon API
+  const createPokemonInBackground = async (nickname: string) => {
+    try {
+      // 確保有圖片和屬性資料
+      if (!state.uploadedFrontImage || !state.uploadedBackImage || !state.aiDeterminedType) {
+        console.warn('[DialogueScreen] 圖片或屬性資料不完整，跳過創建 Pokemon');
+        return;
+      }
+
+      console.log('[DialogueScreen] 開始創建 Pokemon 記錄:', {
+        nickname,
+        type: state.aiDeterminedType,
+      });
+
+      // 調用 API 創建 Pokemon
+      const pokemon = await createPokemonRecord(
+        state.aiDeterminedType,
+        state.uploadedFrontImage,
+        state.uploadedBackImage,
+        nickname  // 使用玩家輸入的名稱
+      );
+
+      // 儲存 Pokemon ID 到 GameContext
+      dispatch({ type: 'SET_POKEMON_ID', pokemonId: pokemon.id });
+
+      console.log('[DialogueScreen] Pokemon 創建成功:', pokemon);
+
+    } catch (error) {
+      console.error('[DialogueScreen] 創建 Pokemon 失敗:', error);
+      // 失敗不影響遊戲流程，只是記錄錯誤
+    }
   };
 
   if (!currentDialogue) {

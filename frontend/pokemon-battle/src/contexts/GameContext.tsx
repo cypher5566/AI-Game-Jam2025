@@ -46,6 +46,7 @@ type GameAction =
   | { type: 'RESET_DIALOGUE' }
   | { type: 'SET_HAS_SEEN_INTRO'; value: boolean }
   | { type: 'SET_POKEMON_NICKNAME'; nickname: string }
+  | { type: 'SET_POKEMON_ID'; pokemonId: string }
   // 錯誤處理
   | { type: 'SET_ERROR'; message: string };
 
@@ -278,6 +279,14 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         pokemonNickname: action.nickname,
         playerPokemon: updatedPlayerPokemon,
+      };
+
+    case 'SET_POKEMON_ID':
+      // 儲存後端創建的 Pokemon ID
+      console.log('[GameContext] 儲存 Pokemon ID:', action.pokemonId);
+      return {
+        ...state,
+        pokemonId: action.pokemonId,
       };
 
     // 錯誤處理

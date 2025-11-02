@@ -118,13 +118,22 @@ const PokemonSprite: React.FC<PokemonSpriteProps> = ({
           resizeMode="contain"
         />
       ) : (
-        <PlaceholderAsset
-          width={64}
-          height={64}
-          color={style.color}
-          label={style.label}
-          style={[styles.sprite]}
-        />
+        // 玩家的 Pokemon：優先使用上傳的背面圖片，否則使用 Placeholder
+        pokemon.backSprite ? (
+          <Image
+            source={{ uri: pokemon.backSprite }}
+            style={styles.playerImage}
+            resizeMode="contain"
+          />
+        ) : (
+          <PlaceholderAsset
+            width={64}
+            height={64}
+            color={style.color}
+            label={style.label}
+            style={[styles.sprite]}
+          />
+        )
       )}
     </Animated.View>
   );
@@ -144,6 +153,12 @@ const styles = StyleSheet.create({
   bossImage: {
     width: 256,
     height: 256,
+  },
+  playerImage: {
+    width: 128,
+    height: 128,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.4)',
   },
 });
 

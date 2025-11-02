@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   // Pokemon 相關
   POKEMON_UPLOAD: '/api/v1/pokemon/upload',
   POKEMON_PROCESS: '/api/v1/pokemon/process',
+  POKEMON_CREATE: '/api/v1/pokemon/create',
 
   // 技能相關
   SKILLS: '/api/v1/skills',
