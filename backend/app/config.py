@@ -37,7 +37,7 @@ class Settings(BaseSettings):
 
     # CORS 配置
     allowed_origins: str = Field(
-        default="http://localhost:8081,http://localhost:19006",
+        default="http://localhost:8086,http://localhost:8085,http://localhost:8081,http://localhost:19006",
         env="ALLOWED_ORIGINS"
     )
 
