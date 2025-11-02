@@ -7,7 +7,9 @@ from typing import Dict, List, Optional, Any
 import logging
 import random
 import string
+import asyncio
 from datetime import datetime
+from time import time
 
 from app.database import get_service_db
 from app.config import settings
@@ -71,6 +73,14 @@ class Room:
         self.battle_log: List[Dict[str, Any]] = []
         self.created_at = datetime.now()
 
+        # 回合計時器 (Phase 3)
+        self.turn_duration = 30  # 30 秒
+        self.turn_start_time: Optional[float] = None  # 回合開始時間 (timestamp)
+        self.turn_timer_task: Optional[asyncio.Task] = None  # 計時器任務
+
+        # 行動收集 (Phase 4)
+        self.pending_actions: Dict[str, Dict[str, Any]] = {}  # {connection_id: {skill, prompt}}
+
     def add_member(self, member: RoomMember) -> bool:
         """
         加入成員
@@ -120,6 +130,53 @@ class Room:
         if len(self.members) == 0:
             return False
         return all(member.is_ready for member in self.members.values())
+
+    def start_turn(self):
+        """開始新回合"""
+        self.turn_start_time = time()
+        self.pending_actions = {}
+        logger.info(f"⏱️  房間 {self.room_code} 開始回合 {self.current_turn + 1}")
+
+    def get_remaining_time(self) -> float:
+        """獲取回合剩餘時間（秒）"""
+        if self.turn_start_time is None:
+            return 0.0
+
+        elapsed = time() - self.turn_start_time
+        remaining = max(0.0, self.turn_duration - elapsed)
+        return remaining
+
+    def submit_action(self, connection_id: str, skill_id: int, prompt: str = ""):
+        """
+        提交玩家行動
+
+        Args:
+            connection_id: 玩家 ID
+            skill_id: 技能 ID
+            prompt: 玩家的戰術描述 Prompt
+        """
+        if connection_id not in self.members:
+            logger.warning(f"⚠️  無效的玩家 ID: {connection_id}")
+            return False
+
+        self.pending_actions[connection_id] = {
+            "skill_id": skill_id,
+            "prompt": prompt,
+            "submitted_at": time()
+        }
+
+        logger.info(f"✅ 玩家 {connection_id} 提交行動: 技能 {skill_id}")
+        return True
+
+    def is_all_actions_submitted(self) -> bool:
+        """檢查是否所有玩家都已提交行動"""
+        return len(self.pending_actions) == len(self.members)
+
+    def get_pending_player_ids(self) -> List[str]:
+        """獲取尚未提交行動的玩家 ID 列表"""
+        all_ids = set(self.members.keys())
+        submitted_ids = set(self.pending_actions.keys())
+        return list(all_ids - submitted_ids)
 
     def start_battle(self):
         """開始戰鬥"""
@@ -175,6 +232,13 @@ class Room:
                 "max_hp": self.boss_max_hp
             },
             "current_turn": self.current_turn,
+            "turn_timer": {
+                "remaining_time": self.get_remaining_time(),
+                "duration": self.turn_duration,
+                "is_active": self.turn_start_time is not None
+            },
+            "pending_actions_count": len(self.pending_actions),
+            "all_actions_submitted": self.is_all_actions_submitted(),
             "created_at": self.created_at.isoformat()
         }
 

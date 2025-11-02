@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 import logging
 import json
+import asyncio
 
 from app.websocket.manager import manager as ws_manager
 from app.websocket.room import room_manager, Room
@@ -204,15 +205,17 @@ async def websocket_room(
 
                     # 檢查是否所有人都準備好
                     if room.is_all_ready() and room.status == "waiting":
-                        # 開始戰鬥
-                        await start_battle(room_code, room)
+                        # 生成 Boss
                         boss = await BossService.generate_boss(
                             player_count=len(room.members),
                             base_hp=room.boss_base_hp
                         )
 
+                        # 開始戰鬥（啟動計時器）
+                        await start_battle(room_code, room, boss)
+
                 elif message_type == "use_skill":
-                    # 使用技能
+                    # 提交技能行動 (Phase 3&4 - 收集而非立即執行)
                     if room.status != "battle":
                         await ws_manager.send_personal_message(connection_id, {
                             "type": "error",
@@ -221,9 +224,24 @@ async def websocket_room(
                         continue
 
                     skill_id = message.get("skill_id")
-                    await handle_player_attack(
-                        room_code, room, boss, connection_id, skill_id
-                    )
+                    prompt = message.get("prompt", "")  # 玩家的戰術描述
+
+                    # 提交行動（儲存到 room.pending_actions）
+                    success = room.submit_action(connection_id, skill_id, prompt)
+
+                    if success:
+                        await ws_manager.send_personal_message(connection_id, {
+                            "type": "action_submitted",
+                            "message": "行動已提交！"
+                        })
+
+                        # 廣播更新
+                        await broadcast_room_update(room_code)
+                    else:
+                        await ws_manager.send_personal_message(connection_id, {
+                            "type": "error",
+                            "message": "提交行動失敗"
+                        })
 
                 elif message_type == "chat":
                     # 聊天訊息
@@ -254,6 +272,16 @@ async def websocket_room(
         # 清理連線
         await ws_manager.disconnect(connection_id)
         await room_manager.leave_room(room_code, connection_id)
+
+        # 清理計時器任務 (Phase 3)
+        if room and room.turn_timer_task:
+            room.turn_timer_task.cancel()
+            try:
+                await room.turn_timer_task
+            except asyncio.CancelledError:
+                pass
+            logger.info(f"⏹️ 計時器已清理")
+
         await broadcast_room_update(room_code)
 
 
@@ -271,85 +299,36 @@ async def broadcast_room_update(room_code: str):
     })
 
 
-async def start_battle(room_code: str, room: Room):
+async def start_battle(room_code: str, room: Room, boss: Boss):
     """開始戰鬥"""
     if not room.start_battle():
-        return
+        return None
+
+    # 開始第一回合
+    room.start_turn()
 
     await ws_manager.broadcast_to_room(room_code, {
         "type": "battle_start",
         "message": "戰鬥開始！",
+        "boss": {
+            "name": boss.name,
+            "type": boss.type,
+            "hp": boss.current_hp,
+            "max_hp": boss.max_hp
+        },
         "room": room.to_dict()
     })
 
+    # 啟動回合計時器 (Phase 3)
+    timer_task = asyncio.create_task(turn_timer_loop(room_code, room, boss))
+    room.turn_timer_task = timer_task
 
-async def handle_player_attack(
-    room_code: str,
-    room: Room,
-    boss: Optional[Boss],
-    connection_id: str,
-    skill_id: int
-):
-    """處理玩家攻擊"""
-    if not boss:
-        logger.error("❌ Boss 不存在")
-        return
+    logger.info(f"⏱️ 房間 {room_code} 計時器已啟動")
 
-    member = room.members.get(connection_id)
-    if not member:
-        logger.error(f"❌ 找不到成員: {connection_id}")
-        return
+    return timer_task
 
-    # 獲取技能資料
-    # TODO: 從資料庫或成員資料中獲取技能
-    # 暫時使用假技能
-    skill = {
-        "id": skill_id,
-        "name": "火焰放射",
-        "type": "fire",
-        "power": 90
-    }
 
-    # 計算傷害
-    player_stats = member.pokemon_data.get("stats", {})
-    damage, effectiveness, message = BossService.calculate_player_damage(
-        player_level=player_stats.get("level", 5),
-        player_attack=player_stats.get("attack", 50),
-        boss=boss,
-        skill=skill
-    )
-
-    # 對 Boss 造成傷害
-    actual_damage, is_defeated = boss.take_damage(damage)
-
-    # 廣播戰鬥動作
-    await ws_manager.broadcast_to_room(room_code, {
-        "type": "battle_action",
-        "data": {
-            "actor": member.player_name,
-            "action": "attack",
-            "skill": skill["name"],
-            "target": boss.name,
-            "damage": actual_damage,
-            "boss_hp": boss.current_hp,
-            "boss_max_hp": boss.max_hp,
-            "effectiveness": effectiveness,
-            "message": f"{member.player_name} 使用了 {skill['name']}！{message}"
-        }
-    })
-
-    # 檢查是否擊敗 Boss
-    if is_defeated:
-        room.status = "finished"
-        await ws_manager.broadcast_to_room(room_code, {
-            "type": "battle_end",
-            "result": "win",
-            "message": "🎉 恭喜！Boss 被擊敗了！"
-        })
-        return
-
-    # Boss 回合
-    await handle_boss_turn(room_code, room, boss)
+# handle_player_attack 已被 process_turn_actions 取代 (批次處理)
 
 
 async def handle_boss_turn(room_code: str, room: Room, boss: Boss):
@@ -360,7 +339,9 @@ async def handle_boss_turn(room_code: str, room: Room, boss: Boss):
             "id": member.connection_id,
             "name": member.player_name,
             "type": member.pokemon_data.get("type", "normal"),
-            "stats": member.pokemon_data.get("stats", {})
+            "stats": member.pokemon_data.get("stats", {}),
+            "hp": member.current_hp,
+            "max_hp": member.max_hp
         }
         for member in room.members.values()
     ]
@@ -371,6 +352,16 @@ async def handle_boss_turn(room_code: str, room: Room, boss: Boss):
     if not result.get("success"):
         return
 
+    # 扣除玩家 HP (Phase 5)
+    target_id = result["target"]["id"]
+    if target_id in room.members:
+        member = room.members[target_id]
+        member.current_hp = max(0, member.current_hp - result["damage"])
+
+        # 檢查玩家是否被擊敗
+        if member.current_hp == 0:
+            logger.warning(f"⚠️ 玩家 {member.player_name} 被擊敗！")
+
     # 廣播 Boss 動作
     await ws_manager.broadcast_to_room(room_code, {
         "type": "battle_action",
@@ -380,7 +371,202 @@ async def handle_boss_turn(room_code: str, room: Room, boss: Boss):
             "skill": result["skill"]["name"],
             "target": result["target"]["name"],
             "damage": result["damage"],
+            "target_hp": room.members[target_id].current_hp if target_id in room.members else 0,
             "effectiveness": result["effectiveness"],
             "message": f"{boss.name} 使用了 {result['skill']['name']}！{result['message']}"
         }
     })
+
+    # 檢查是否所有玩家都被擊敗 (Phase 5)
+    all_defeated = all(member.current_hp == 0 for member in room.members.values())
+    if all_defeated:
+        room.status = "finished"
+        await ws_manager.broadcast_to_room(room_code, {
+            "type": "battle_end",
+            "result": "lose",
+            "message": "💀 全軍覆沒！挑戰失敗..."
+        })
+        return True  # 返回 True 表示戰鬥結束
+
+    return False  # 返回 False 表示戰鬥繼續
+
+
+async def process_turn_actions(room_code: str, room: Room, boss: Boss):
+    """
+    批次處理所有玩家的回合行動 (Phase 3&4)
+
+    流程:
+    1. 為所有行動評分 Prompt
+    2. 計算所有傷害
+    3. 廣播所有玩家攻擊結果
+    4. Boss 反擊
+    """
+    from app.services.prompt_evaluator_service import get_prompt_evaluator
+    from app.services.skills_service import get_skills_service
+
+    logger.info(f"⚔️ 開始處理回合 {room.current_turn + 1} 的所有行動...")
+
+    # 處理超時的玩家（使用第一個技能，無 Prompt 獎勵）
+    skills_service = get_skills_service()
+    for member_id in room.get_pending_player_ids():
+        member = room.members.get(member_id)
+        if not member:
+            continue
+
+        # 獲取該屬性的第一個技能
+        pokemon_type = member.pokemon_data.get("type", "normal")
+        skills = skills_service.get_skills_by_type(pokemon_type, count=1)
+
+        if skills:
+            default_skill_id = skills[0]["id"]
+            room.submit_action(member_id, default_skill_id, prompt="")
+            logger.warning(f"⏰ 玩家 {member.player_name} 超時，自動使用技能 {skills[0]['name']}")
+
+    # 1. 評分所有 Prompt 並計算傷害
+    evaluator = get_prompt_evaluator()
+    player_actions = []
+
+    for member_id, action in room.pending_actions.items():
+        member = room.members.get(member_id)
+        if not member:
+            continue
+
+        # 獲取技能資料
+        skill_id = action["skill_id"]
+        prompt = action.get("prompt", "")
+
+        # TODO: 從資料庫獲取真實技能，目前使用 skills_service
+        skills = skills_service.get_skills_by_type(
+            member.pokemon_data.get("type", "normal"),
+            count=12
+        )
+        skill = next((s for s in skills if s["id"] == skill_id), None)
+
+        if not skill:
+            # 使用預設技能
+            skill = {"id": skill_id, "name": "撞擊", "type": "normal", "power": 40}
+
+        # 評分 Prompt
+        prompt_multiplier = await evaluator.evaluate_prompt(
+            player_prompt=prompt,
+            skill_name=skill["name"],
+            skill_type=skill["type"],
+            boss_name=boss.name,
+            boss_type=boss.type
+        )
+
+        # 計算傷害
+        damage, effectiveness, message = BattleService.calculate_damage(
+            skill_power=skill["power"],
+            skill_type=skill["type"],
+            defender_type=boss.type,
+            prompt_multiplier=prompt_multiplier
+        )
+
+        player_actions.append({
+            "member_id": member_id,
+            "member": member,
+            "skill": skill,
+            "prompt": prompt,
+            "prompt_multiplier": prompt_multiplier,
+            "damage": damage,
+            "effectiveness": effectiveness,
+            "message": message
+        })
+
+    # 2. 對 Boss 造成所有傷害
+    total_damage = sum(action["damage"] for action in player_actions)
+    boss.current_hp = max(0, boss.current_hp - total_damage)
+
+    logger.info(f"💥 總傷害: {total_damage}，Boss 剩餘 HP: {boss.current_hp}/{boss.max_hp}")
+
+    # 3. 廣播所有玩家的攻擊結果
+    for action in player_actions:
+        await ws_manager.broadcast_to_room(room_code, {
+            "type": "battle_action",
+            "data": {
+                "actor": action["member"].player_name,
+                "action": "attack",
+                "skill": action["skill"]["name"],
+                "prompt": action["prompt"],
+                "prompt_score": int(action["prompt_multiplier"] * 100),  # 0-50
+                "damage": action["damage"],
+                "boss_hp": boss.current_hp,
+                "boss_max_hp": boss.max_hp,
+                "effectiveness": action["effectiveness"],
+                "message": f"{action['member'].player_name} 使用了 {action['skill']['name']}！{action['message']} (Prompt獎勵: {int(action['prompt_multiplier']*100)}%)"
+            }
+        })
+
+        # 稍微延遲讓前端能依序顯示
+        await asyncio.sleep(0.5)
+
+    # 檢查是否擊敗 Boss (Phase 5)
+    if boss.current_hp == 0:
+        room.status = "finished"
+        await ws_manager.broadcast_to_room(room_code, {
+            "type": "battle_end",
+            "result": "win",
+            "message": "🎉 恭喜！Boss 被擊敗了！"
+        })
+        return True  # 返回 True 表示戰鬥結束
+
+    # 4. Boss 反擊
+    battle_ended = await handle_boss_turn(room_code, room, boss)
+
+    if battle_ended:
+        return True
+
+    # 回合結束
+    room.current_turn += 1
+    return False
+
+
+async def turn_timer_loop(room_code: str, room: Room, boss: Boss):
+    """
+    回合計時器循環 (Phase 3)
+
+    每秒廣播剩餘時間，30秒到時自動處理行動
+    """
+    try:
+        while room.status == "battle":
+            remaining = room.get_remaining_time()
+
+            # 廣播剩餘時間
+            await ws_manager.broadcast_to_room(room_code, {
+                "type": "turn_timer",
+                "data": {
+                    "remaining_time": remaining,
+                    "current_turn": room.current_turn,
+                    "pending_count": len(room.get_pending_player_ids())
+                }
+            })
+
+            # 檢查是否時間到或所有人都已提交
+            if remaining <= 0 or room.is_all_actions_submitted():
+                # 處理所有行動
+                battle_ended = await process_turn_actions(room_code, room, boss)
+
+                if battle_ended:
+                    break
+
+                # 開始新回合
+                room.start_turn()
+
+                # 廣播新回合開始
+                await ws_manager.broadcast_to_room(room_code, {
+                    "type": "new_turn",
+                    "data": {
+                        "turn": room.current_turn,
+                        "boss_hp": boss.current_hp,
+                        "boss_max_hp": boss.max_hp
+                    }
+                })
+
+            # 每秒更新一次
+            await asyncio.sleep(1)
+
+    except asyncio.CancelledError:
+        logger.info(f"⏹️ 房間 {room_code} 計時器已停止")
+    except Exception as e:
+        logger.error(f"❌ 計時器錯誤: {e}")
