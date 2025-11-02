@@ -6,7 +6,6 @@ yarn-error.log
 # Expo
 .expo
 .expo-shared
-dist
 web-build
 
 # Environment variables
