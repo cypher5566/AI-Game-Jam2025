@@ -1,13 +1,15 @@
 import { Skill } from '../types';
+import { API_BASE_URL, API_ENDPOINTS, TYPE_ZH_TO_EN, TYPE_EN_TO_ZH } from './apiConfig';
+import type { SkillsResponse, SkillData } from '../types/api';
 
-// API 回應的介面定義
-interface APIMoveResponse {
+// Google Sheets API 回應的介面定義（作為 Fallback）
+interface GoogleSheetsAPIMoveResponse {
   success: boolean;
   count: number;
-  moves: APIMove[];
+  moves: GoogleSheetsAPIMove[];
 }
 
-interface APIMove {
+interface GoogleSheetsAPIMove {
   編號: number;
   中文名: string;
   日文名: string;
@@ -20,54 +22,121 @@ interface APIMove {
   PP: number;
 }
 
-// API 端點
-const API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyvDy_1ke3ko9vP4N5GkkY_9nwxrlDwXrDWv8VZDSwtANaNlCTZVC2jvtOVx_4x-ga06Q/exec';
-
-// 屬性對照表（中文 → 英文）
-const TYPE_MAP: Record<string, string> = {
-  '火': 'fire',
-  '水': 'water',
-  '草': 'grass',
-  '電': 'electric',
-  '一般': 'normal',
-};
+// Google Sheets API 端點（Fallback）
+const GOOGLE_SHEETS_API_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyvDy_1ke3ko9vP4N5GkkY_9nwxrlDwXrDWv8VZDSwtANaNlCTZVC2jvtOVx_4x-ga06Q/exec';
 
 /**
- * 從 API 抓取寶可夢招式
+ * 從後端 API 抓取寶可夢招式
  * @param type 寶可夢屬性（中文），例如：'火'
  * @returns 12 個招式的陣列
  */
 export const fetchPokemonMoves = async (type: string): Promise<Skill[]> => {
   try {
-    const response = await fetch(`${API_ENDPOINT}?type1=${encodeURIComponent(type)}`);
+    console.log('[SkillsAPI] 開始獲取技能，屬性:', type);
 
-    if (!response.ok) {
-      throw new Error(`API 請求失敗: ${response.status}`);
+    // 先嘗試使用後端 API
+    try {
+      const skills = await fetchFromBackendAPI(type);
+      console.log('[SkillsAPI] 後端 API 成功，獲得', skills.length, '個技能');
+      return skills;
+    } catch (backendError) {
+      console.warn('[SkillsAPI] 後端 API 失敗，嘗試 Fallback:', backendError);
+
+      // 如果後端失敗，使用 Google Sheets API
+      try {
+        const skills = await fetchFromGoogleSheets(type);
+        console.log('[SkillsAPI] Google Sheets Fallback 成功');
+        return skills;
+      } catch (googleError) {
+        console.warn('[SkillsAPI] Google Sheets 失敗，使用預設技能:', googleError);
+
+        // 最後的 Fallback：使用預設技能
+        return getDefaultFireMoves();
+      }
     }
-
-    const data: APIMoveResponse = await response.json();
-
-    if (!data.success) {
-      throw new Error('API 回傳失敗狀態');
-    }
-
-    // 將 API 資料轉換為遊戲的 Skill 格式
-    const skills: Skill[] = data.moves.map((move, index) => ({
-      id: `api_move_${index}_${Date.now()}`, // 產生唯一 ID
-      name: move.中文名,
-      type: TYPE_MAP[move.屬性] || 'normal', // 轉換屬性為英文
-      power: parsePower(move.威力), // 處理威力（可能是數字或字串）
-      accuracy: move.命中,
-      description: move.說明,
-    }));
-
-    return skills;
   } catch (error) {
-    console.error('抓取寶可夢招式時發生錯誤:', error);
-    // 如果 API 失敗，回傳預設的火屬性招式
+    console.error('[SkillsAPI] 所有方法失敗，使用預設技能:', error);
     return getDefaultFireMoves();
   }
 };
+
+/**
+ * 從後端 API 獲取技能
+ */
+async function fetchFromBackendAPI(typeZh: string): Promise<Skill[]> {
+  // 將中文屬性轉換為英文
+  const typeEn = TYPE_ZH_TO_EN[typeZh];
+  if (!typeEn) {
+    throw new Error(`不支援的屬性: ${typeZh}`);
+  }
+
+  const url = `${API_BASE_URL}${API_ENDPOINTS.SKILLS}?type=${encodeURIComponent(typeZh)}&count=12`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`後端 API 請求失敗: ${response.status}`);
+  }
+
+  const data: SkillsResponse = await response.json();
+
+  if (!data.success) {
+    throw new Error('後端 API 回傳失敗狀態');
+  }
+
+  // 將後端格式轉換為遊戲的 Skill 格式
+  const skills: Skill[] = data.data.map((skillData) => transformSkillData(skillData));
+
+  return skills;
+}
+
+/**
+ * 將後端技能資料轉換為遊戲格式
+ */
+function transformSkillData(skillData: SkillData): Skill {
+  return {
+    id: String(skillData.id),
+    name: skillData.name,  // 已經是中文名
+    type: skillData.type as any,  // 英文屬性
+    power: skillData.power,
+    accuracy: skillData.accuracy,
+    description: skillData.description,  // 已經是中文描述
+  };
+}
+
+/**
+ * 從 Google Sheets API 獲取技能（Fallback）
+ */
+async function fetchFromGoogleSheets(type: string): Promise<Skill[]> {
+  const response = await fetch(`${GOOGLE_SHEETS_API_ENDPOINT}?type1=${encodeURIComponent(type)}`);
+
+  if (!response.ok) {
+    throw new Error(`Google Sheets API 請求失敗: ${response.status}`);
+  }
+
+  const data: GoogleSheetsAPIMoveResponse = await response.json();
+
+  if (!data.success) {
+    throw new Error('Google Sheets API 回傳失敗狀態');
+  }
+
+  // 將 API 資料轉換為遊戲的 Skill 格式
+  const skills: Skill[] = data.moves.map((move, index) => ({
+    id: `gs_move_${index}_${Date.now()}`,
+    name: move.中文名,
+    type: (TYPE_ZH_TO_EN[move.屬性] || 'normal') as any,
+    power: parsePower(move.威力),
+    accuracy: move.命中,
+    description: move.說明,
+  }));
+
+  return skills;
+}
 
 /**
  * 解析威力值（處理可能是字串或數字的情況）

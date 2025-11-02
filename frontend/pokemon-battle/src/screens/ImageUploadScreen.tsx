@@ -1,32 +1,74 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Modal, Pressable } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Modal, Pressable, ActivityIndicator } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useGame } from '../contexts/GameContext';
+import { uploadPokemonImage, pollProcessStatus, validateImageFile } from '../services/pokemonAPI';
+import { TYPE_EN_TO_ZH } from '../services/apiConfig';
 
 /**
  * 圖片上傳畫面（彈窗式介面）
- * 實際的圖片上傳和 AI 判定功能由後端同事實作
- * 目前提供 UI 介面，點擊後使用預設寶可夢繼續流程
+ * 整合後端 API 進行圖片上傳和 AI 處理
  */
 const ImageUploadScreen: React.FC = () => {
   const { dispatch } = useGame();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('');
 
-  // 模擬圖片選擇（實際實作會使用 expo-image-picker）
-  const handleSelectImage = () => {
-    Alert.alert(
-      '功能開發中',
-      '圖片上傳功能將由後端同事整合實作。\n目前將使用預設寶可夢繼續遊戲。',
-      [
-        {
-          text: '確定',
-          onPress: () => {
-            // 模擬選擇了一張圖片
-            setSelectedImage('placeholder');
-          },
-        },
-      ]
-    );
+  // 選擇圖片
+  const handleSelectImage = async () => {
+    try {
+      console.log('[ImageUpload] 開始選擇圖片...');
+
+      // 請求權限（web 環境會自動授予）
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('[ImageUpload] 權限結果:', permissionResult);
+
+      if (!permissionResult.granted) {
+        console.warn('[ImageUpload] 權限被拒絕');
+        Alert.alert('需要權限', '請允許存取相簿以選擇圖片');
+        return;
+      }
+
+      console.log('[ImageUpload] 開啟圖片選擇器...');
+      // 開啟圖片選擇器
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      console.log('[ImageUpload] 選擇結果:', result);
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        const asset = result.assets[0];
+        console.log('[ImageUpload] 圖片資訊:', asset);
+
+        // 驗證圖片（web 環境使用 mimeType，原生環境使用 uri）
+        const validation = validateImageFile(
+          asset.uri,
+          asset.fileSize,
+          asset.mimeType
+        );
+        if (!validation.valid) {
+          console.warn('[ImageUpload] 圖片驗證失敗:', validation.error);
+          Alert.alert('圖片無效', validation.error || '請選擇有效的圖片檔案');
+          return;
+        }
+
+        setSelectedImage(asset.uri);
+        console.log('[ImageUpload] 圖片已選擇:', asset.uri);
+        Alert.alert('成功', '圖片已選擇！請點擊「確認上傳」');
+      } else {
+        console.log('[ImageUpload] 用戶取消選擇');
+      }
+    } catch (error) {
+      console.error('[ImageUpload] 選擇圖片失敗:', error);
+      Alert.alert('錯誤', `無法選擇圖片: ${error instanceof Error ? error.message : '未知錯誤'}`);
+    }
   };
 
   // 跳過上傳，使用預設寶可夢
@@ -38,28 +80,82 @@ const ImageUploadScreen: React.FC = () => {
     }, 300);
   };
 
-  // 確認上傳（目前也是跳過）
-  const handleConfirm = () => {
+  // 確認上傳
+  const handleConfirm = async () => {
     if (!selectedImage) {
       Alert.alert('提示', '請先選擇圖片，或點擊「跳過」使用預設寶可夢');
       return;
     }
 
-    // TODO: 實際實作時，這裡會呼叫 API 上傳圖片
-    // const response = await uploadPokemonImage(imageFile);
-    // dispatch({ type: 'SET_POKEMON_TYPE', pokemonType: response.type });
+    setUploading(true);
+    setStatusMessage('正在上傳圖片...');
 
-    // 目前直接跳過
-    Alert.alert(
-      '提示',
-      '圖片上傳功能開發中，將使用預設寶可夢',
-      [
-        {
-          text: '確定',
-          onPress: handleSkip,
-        },
-      ]
-    );
+    try {
+      // 步驟 1: 上傳圖片
+      console.log('[ImageUpload] 開始上傳圖片');
+      const uploadId = await uploadPokemonImage(selectedImage);
+      console.log('[ImageUpload] 上傳成功，ID:', uploadId);
+
+      // 步驟 2: 輪詢處理狀態
+      setUploading(false);
+      setProcessing(true);
+      setStatusMessage('AI 正在處理圖片...');
+
+      const result = await pollProcessStatus(uploadId, (status, attempt) => {
+        setStatusMessage(`AI 處理中... (${attempt}/30)`);
+      });
+
+      console.log('[ImageUpload] 處理完成:', result);
+
+      // 步驟 3: 檢查結果
+      if (result.status === 'completed' && result.data) {
+        const { front_image, back_image, type, type_chinese } = result.data;
+
+        console.log('[ImageUpload] AI 判定屬性:', type_chinese, `(${type})`);
+
+        // 儲存圖片和屬性到 GameContext
+        dispatch({
+          type: 'SET_POKEMON_IMAGES',
+          frontImage: front_image,
+          backImage: back_image,
+        });
+
+        dispatch({
+          type: 'SET_AI_TYPE',
+          pokemonType: type,
+        });
+
+        // 顯示成功訊息
+        setStatusMessage(`成功！屬性：${type_chinese}`);
+
+        // 等待一下讓用戶看到結果
+        setTimeout(() => {
+          setModalVisible(false);
+          setTimeout(() => {
+            dispatch({ type: 'SKIP_IMAGE_UPLOAD' });
+          }, 300);
+        }, 1500);
+
+      } else {
+        throw new Error('處理結果無效');
+      }
+
+    } catch (error) {
+      console.error('[ImageUpload] 失敗:', error);
+      setUploading(false);
+      setProcessing(false);
+      setStatusMessage('');
+
+      // 顯示錯誤並提供選項
+      Alert.alert(
+        '上傳失敗',
+        error instanceof Error ? error.message : '圖片處理失敗',
+        [
+          { text: '重試', onPress: handleConfirm },
+          { text: '使用預設', onPress: handleSkip },
+        ]
+      );
+    }
   };
 
   return (
@@ -92,13 +188,32 @@ const ImageUploadScreen: React.FC = () => {
           <View style={styles.uploadArea}>
             {selectedImage ? (
               <View style={styles.imagePreview}>
-                <Text style={styles.placeholderText}>圖片已選擇</Text>
-                <Text style={styles.hintText}>（實際圖片預覽將由後端整合實作）</Text>
+                <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+                {!uploading && !processing && (
+                  <TouchableOpacity
+                    style={styles.changeButton}
+                    onPress={handleSelectImage}
+                  >
+                    <Text style={styles.changeButtonText}>更換圖片</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ) : (
-              <TouchableOpacity style={styles.selectButton} onPress={handleSelectImage}>
+              <TouchableOpacity
+                style={styles.selectButton}
+                onPress={handleSelectImage}
+                disabled={uploading || processing}
+              >
                 <Text style={styles.selectButtonText}>📷 選擇圖片</Text>
               </TouchableOpacity>
+            )}
+
+            {/* 處理狀態顯示 */}
+            {(uploading || processing) && (
+              <View style={styles.statusContainer}>
+                <ActivityIndicator size="large" color="#4ecca3" />
+                <Text style={styles.statusText}>{statusMessage}</Text>
+              </View>
             )}
           </View>
 
@@ -110,21 +225,12 @@ const ImageUploadScreen: React.FC = () => {
             <Text style={styles.infoText}>• 圖片將用於生成專屬的像素化寶可夢</Text>
           </View>
 
-          {/* 功能開發中提示 */}
-          <View style={styles.devNotice}>
-            <Text style={styles.devNoticeText}>
-              🚧 此功能正在開發中
-            </Text>
-            <Text style={styles.devNoticeSubtext}>
-              圖片上傳和 AI 判定功能將由後端團隊整合
-            </Text>
-          </View>
-
           {/* 按鈕區 */}
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, styles.skipButton]}
               onPress={handleSkip}
+              disabled={uploading || processing}
             >
               <Text style={styles.skipButtonText}>跳過（使用預設）</Text>
             </TouchableOpacity>
@@ -133,13 +239,19 @@ const ImageUploadScreen: React.FC = () => {
               style={[
                 styles.button,
                 styles.confirmButton,
-                !selectedImage && styles.buttonDisabled,
+                (!selectedImage || uploading || processing) && styles.buttonDisabled,
               ]}
               onPress={handleConfirm}
-              disabled={!selectedImage}
+              disabled={!selectedImage || uploading || processing}
             >
               <Text style={styles.confirmButtonText}>
-                {selectedImage ? '確認上傳' : '請先選擇圖片'}
+                {uploading
+                  ? '上傳中...'
+                  : processing
+                  ? '處理中...'
+                  : selectedImage
+                  ? '確認上傳'
+                  : '請先選擇圖片'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -241,6 +353,46 @@ const styles = StyleSheet.create({
   },
   imagePreview: {
     alignItems: 'center',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+  },
+  previewImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+  changeButton: {
+    backgroundColor: 'rgba(78, 204, 163, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#4ecca3',
+  },
+  changeButtonText: {
+    color: '#4ecca3',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  statusContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 15,
+  },
+  statusText: {
+    color: '#4ecca3',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 15,
+    textAlign: 'center',
   },
   placeholderText: {
     color: '#4ecca3',
@@ -269,24 +421,6 @@ const styles = StyleSheet.create({
     color: '#ccc',
     fontSize: 12,
     marginBottom: 4,
-  },
-  devNotice: {
-    backgroundColor: '#533483',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-    alignItems: 'center',
-  },
-  devNoticeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  devNoticeSubtext: {
-    color: '#ddd',
-    fontSize: 11,
-    textAlign: 'center',
   },
   buttonContainer: {
     flexDirection: 'row',

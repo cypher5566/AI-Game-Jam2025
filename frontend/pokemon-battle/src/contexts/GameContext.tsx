@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useReducer, ReactNode } from 'react';
-import { GameState, Pokemon, BattleState, Position, Skill } from '../types';
+import { GameState, Pokemon, BattleState, Position, Skill, PokemonType } from '../types';
 import { PLAYER_START_POSITION } from '../data/maps';
 import { createPokemon } from '../data/pokemon';
 import { skillPreloader } from '../services/skillPreloader';
@@ -25,6 +25,8 @@ type GameAction =
   | { type: 'SKIP_IMAGE_UPLOAD' }
   | { type: 'SET_UPLOADED_IMAGE'; image: string }
   | { type: 'SET_POKEMON_TYPE'; pokemonType: PokemonType }
+  | { type: 'SET_POKEMON_IMAGES'; frontImage: string; backImage: string }
+  | { type: 'SET_AI_TYPE'; pokemonType: string }
   // 技能預加載相關
   | { type: 'START_LOADING_SKILLS' }
   | { type: 'SKILLS_LOADED' }
@@ -208,6 +210,21 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       return {
         ...state,
         pokemonType: action.pokemonType,
+      };
+
+    case 'SET_POKEMON_IMAGES':
+      // 儲存 AI 生成的前後圖片
+      return {
+        ...state,
+        uploadedFrontImage: action.frontImage,
+        uploadedBackImage: action.backImage,
+      };
+
+    case 'SET_AI_TYPE':
+      // 儲存 AI 判定的屬性
+      return {
+        ...state,
+        aiDeterminedType: action.pokemonType,
       };
 
     // 對話相關
