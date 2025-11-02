@@ -19,20 +19,21 @@ router = APIRouter()
 # 請求/響應模型
 class DamageCalculationRequest(BaseModel):
     """傷害計算請求"""
-    attacker_level: int = Field(ge=1, le=100, description="攻擊方等級")
-    attacker_attack: int = Field(ge=1, description="攻擊方攻擊力")
-    defender_defense: int = Field(ge=1, description="防禦方防禦力")
     skill_power: int = Field(ge=0, description="技能威力")
     skill_type: str = Field(description="技能屬性")
     defender_type: str = Field(description="防禦方屬性")
-    is_critical: Optional[bool] = Field(default=None, description="是否會心一擊（可選）")
+    prompt_multiplier: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=0.5,
+        description="Prompt倍率 (0.0=0%, 0.1=10%, ... 0.5=50%)"
+    )
 
 
 class DamageCalculationResponse(BaseModel):
     """傷害計算響應"""
     damage: int = Field(description="計算出的傷害值")
-    type_effectiveness: float = Field(description="屬性相剋倍率")
-    is_critical: bool = Field(description="是否會心一擊")
+    type_effectiveness: float = Field(description="屬性相剋倍率 (-1.0=免疫, -0.2=劣勢, 0.0=普通, 0.25=優勢)")
     message: str = Field(description="效果訊息")
 
 
@@ -49,13 +50,12 @@ async def calculate_damage(request: DamageCalculationRequest):
     """
     計算戰鬥傷害
 
-    基於 Pokemon 經典傷害公式計算傷害值，考慮：
-    - 等級差異
-    - 攻防比例
+    新版簡化公式: 威力 × (1 + 屬性倍率 + Prompt倍率)
+
+    考慮因素：
     - 技能威力
-    - 屬性相剋
-    - 會心一擊（5% 機率或指定）
-    - 隨機浮動（85%-100%）
+    - 屬性相剋 (+25% 優勢, 0% 普通, -20% 劣勢, -100% 免疫)
+    - Prompt倍率 (0% ~ 50%，由 AI 評分決定)
     """
     try:
         # 驗證屬性是否合法
@@ -72,22 +72,15 @@ async def calculate_damage(request: DamageCalculationRequest):
 
         # 計算傷害
         damage, effectiveness, message = BattleService.calculate_damage(
-            attacker_level=request.attacker_level,
-            attacker_attack=request.attacker_attack,
-            defender_defense=request.defender_defense,
             skill_power=request.skill_power,
             skill_type=request.skill_type,
             defender_type=request.defender_type,
-            is_critical=request.is_critical if request.is_critical is not None else False
+            prompt_multiplier=request.prompt_multiplier
         )
-
-        # 判斷是否會心
-        is_critical = "會心一擊" in message
 
         return DamageCalculationResponse(
             damage=damage,
             type_effectiveness=effectiveness,
-            is_critical=is_critical,
             message=message
         )
 

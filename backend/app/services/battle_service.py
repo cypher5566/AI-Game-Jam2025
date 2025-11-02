@@ -10,162 +10,163 @@ from app.config import settings
 
 # 18x18 屬性相剋表
 # 格式: TYPE_EFFECTIVENESS[攻擊屬性][防禦屬性] = 倍率
+# 新版倍率: +0.25 (優勢), 0.0 (普通), -0.2 (劣勢), -1.0 (免疫)
 TYPE_EFFECTIVENESS: Dict[str, Dict[str, float]] = {
     "normal": {
-        "rock": 0.5,
-        "ghost": 0.0,
-        "steel": 0.5,
+        "rock": -0.2,
+        "ghost": -1.0,
+        "steel": -0.2,
     },
     "fire": {
-        "fire": 0.5,
-        "water": 0.5,
-        "grass": 2.0,
-        "ice": 2.0,
-        "bug": 2.0,
-        "rock": 0.5,
-        "dragon": 0.5,
-        "steel": 2.0,
+        "fire": -0.2,
+        "water": -0.2,
+        "grass": 0.25,
+        "ice": 0.25,
+        "bug": 0.25,
+        "rock": -0.2,
+        "dragon": -0.2,
+        "steel": 0.25,
     },
     "water": {
-        "fire": 2.0,
-        "water": 0.5,
-        "grass": 0.5,
-        "ground": 2.0,
-        "rock": 2.0,
-        "dragon": 0.5,
+        "fire": 0.25,
+        "water": -0.2,
+        "grass": -0.2,
+        "ground": 0.25,
+        "rock": 0.25,
+        "dragon": -0.2,
     },
     "electric": {
-        "water": 2.0,
-        "electric": 0.5,
-        "grass": 0.5,
-        "ground": 0.0,
-        "flying": 2.0,
-        "dragon": 0.5,
+        "water": 0.25,
+        "electric": -0.2,
+        "grass": -0.2,
+        "ground": -1.0,
+        "flying": 0.25,
+        "dragon": -0.2,
     },
     "grass": {
-        "fire": 0.5,
-        "water": 2.0,
-        "grass": 0.5,
-        "poison": 0.5,
-        "ground": 2.0,
-        "flying": 0.5,
-        "bug": 0.5,
-        "rock": 2.0,
-        "dragon": 0.5,
-        "steel": 0.5,
+        "fire": -0.2,
+        "water": 0.25,
+        "grass": -0.2,
+        "poison": -0.2,
+        "ground": 0.25,
+        "flying": -0.2,
+        "bug": -0.2,
+        "rock": 0.25,
+        "dragon": -0.2,
+        "steel": -0.2,
     },
     "ice": {
-        "fire": 0.5,
-        "water": 0.5,
-        "grass": 2.0,
-        "ice": 0.5,
-        "ground": 2.0,
-        "flying": 2.0,
-        "dragon": 2.0,
-        "steel": 0.5,
+        "fire": -0.2,
+        "water": -0.2,
+        "grass": 0.25,
+        "ice": -0.2,
+        "ground": 0.25,
+        "flying": 0.25,
+        "dragon": 0.25,
+        "steel": -0.2,
     },
     "fighting": {
-        "normal": 2.0,
-        "ice": 2.0,
-        "poison": 0.5,
-        "flying": 0.5,
-        "psychic": 0.5,
-        "bug": 0.5,
-        "rock": 2.0,
-        "ghost": 0.0,
-        "dark": 2.0,
-        "steel": 2.0,
-        "fairy": 0.5,
+        "normal": 0.25,
+        "ice": 0.25,
+        "poison": -0.2,
+        "flying": -0.2,
+        "psychic": -0.2,
+        "bug": -0.2,
+        "rock": 0.25,
+        "ghost": -1.0,
+        "dark": 0.25,
+        "steel": 0.25,
+        "fairy": -0.2,
     },
     "poison": {
-        "grass": 2.0,
-        "poison": 0.5,
-        "ground": 0.5,
-        "rock": 0.5,
-        "ghost": 0.5,
-        "steel": 0.0,
-        "fairy": 2.0,
+        "grass": 0.25,
+        "poison": -0.2,
+        "ground": -0.2,
+        "rock": -0.2,
+        "ghost": -0.2,
+        "steel": -1.0,
+        "fairy": 0.25,
     },
     "ground": {
-        "fire": 2.0,
-        "electric": 2.0,
-        "grass": 0.5,
-        "poison": 2.0,
-        "flying": 0.0,
-        "bug": 0.5,
-        "rock": 2.0,
-        "steel": 2.0,
+        "fire": 0.25,
+        "electric": 0.25,
+        "grass": -0.2,
+        "poison": 0.25,
+        "flying": -1.0,
+        "bug": -0.2,
+        "rock": 0.25,
+        "steel": 0.25,
     },
     "flying": {
-        "electric": 0.5,
-        "grass": 2.0,
-        "fighting": 2.0,
-        "bug": 2.0,
-        "rock": 0.5,
-        "steel": 0.5,
+        "electric": -0.2,
+        "grass": 0.25,
+        "fighting": 0.25,
+        "bug": 0.25,
+        "rock": -0.2,
+        "steel": -0.2,
     },
     "psychic": {
-        "fighting": 2.0,
-        "poison": 2.0,
-        "psychic": 0.5,
-        "dark": 0.0,
-        "steel": 0.5,
+        "fighting": 0.25,
+        "poison": 0.25,
+        "psychic": -0.2,
+        "dark": -1.0,
+        "steel": -0.2,
     },
     "bug": {
-        "fire": 0.5,
-        "grass": 2.0,
-        "fighting": 0.5,
-        "poison": 0.5,
-        "flying": 0.5,
-        "psychic": 2.0,
-        "ghost": 0.5,
-        "dark": 2.0,
-        "steel": 0.5,
-        "fairy": 0.5,
+        "fire": -0.2,
+        "grass": 0.25,
+        "fighting": -0.2,
+        "poison": -0.2,
+        "flying": -0.2,
+        "psychic": 0.25,
+        "ghost": -0.2,
+        "dark": 0.25,
+        "steel": -0.2,
+        "fairy": -0.2,
     },
     "rock": {
-        "fire": 2.0,
-        "ice": 2.0,
-        "fighting": 0.5,
-        "ground": 0.5,
-        "flying": 2.0,
-        "bug": 2.0,
-        "steel": 0.5,
+        "fire": 0.25,
+        "ice": 0.25,
+        "fighting": -0.2,
+        "ground": -0.2,
+        "flying": 0.25,
+        "bug": 0.25,
+        "steel": -0.2,
     },
     "ghost": {
-        "normal": 0.0,
-        "psychic": 2.0,
-        "ghost": 2.0,
-        "dark": 0.5,
+        "normal": -1.0,
+        "psychic": 0.25,
+        "ghost": 0.25,
+        "dark": -0.2,
     },
     "dragon": {
-        "dragon": 2.0,
-        "steel": 0.5,
-        "fairy": 0.0,
+        "dragon": 0.25,
+        "steel": -0.2,
+        "fairy": -1.0,
     },
     "dark": {
-        "fighting": 0.5,
-        "psychic": 2.0,
-        "ghost": 2.0,
-        "dark": 0.5,
-        "fairy": 0.5,
+        "fighting": -0.2,
+        "psychic": 0.25,
+        "ghost": 0.25,
+        "dark": -0.2,
+        "fairy": -0.2,
     },
     "steel": {
-        "fire": 0.5,
-        "water": 0.5,
-        "electric": 0.5,
-        "ice": 2.0,
-        "rock": 2.0,
-        "steel": 0.5,
-        "fairy": 2.0,
+        "fire": -0.2,
+        "water": -0.2,
+        "electric": -0.2,
+        "ice": 0.25,
+        "rock": 0.25,
+        "steel": -0.2,
+        "fairy": 0.25,
     },
     "fairy": {
-        "fire": 0.5,
-        "fighting": 2.0,
-        "poison": 0.5,
-        "dragon": 2.0,
-        "dark": 2.0,
-        "steel": 0.5,
+        "fire": -0.2,
+        "fighting": 0.25,
+        "poison": -0.2,
+        "dragon": 0.25,
+        "dark": 0.25,
+        "steel": -0.2,
     },
 }
 
@@ -183,7 +184,7 @@ class BattleService:
             defense_type: 防禦方屬性
 
         Returns:
-            倍率 (0.0 = 無效, 0.5 = 不佳, 1.0 = 普通, 2.0 = 效果絕佳)
+            倍率 (-1.0 = 免疫, -0.2 = 劣勢, 0.0 = 普通, +0.25 = 優勢)
         """
         # 驗證屬性是否合法
         if attack_type not in settings.POKEMON_TYPES:
@@ -191,8 +192,8 @@ class BattleService:
         if defense_type not in settings.POKEMON_TYPES:
             defense_type = "normal"
 
-        # 查詢倍率，預設為 1.0（普通傷害）
-        effectiveness = TYPE_EFFECTIVENESS.get(attack_type, {}).get(defense_type, 1.0)
+        # 查詢倍率，預設為 0.0（普通傷害）
+        effectiveness = TYPE_EFFECTIVENESS.get(attack_type, {}).get(defense_type, 0.0)
         return effectiveness
 
     @classmethod
@@ -206,11 +207,11 @@ class BattleService:
         Returns:
             效果訊息（中文）
         """
-        if effectiveness == 0.0:
+        if effectiveness == -1.0:
             return "完全沒有效果..."
-        elif effectiveness == 0.5:
+        elif effectiveness == -0.2:
             return "效果不佳..."
-        elif effectiveness == 2.0:
+        elif effectiveness == 0.25:
             return "效果絕佳！"
         else:
             return ""
@@ -218,62 +219,46 @@ class BattleService:
     @classmethod
     def calculate_damage(
         cls,
-        attacker_level: int,
-        attacker_attack: int,
-        defender_defense: int,
         skill_power: int,
         skill_type: str,
         defender_type: str,
-        is_critical: bool = False
+        prompt_multiplier: float = 0.0
     ) -> Tuple[int, float, str]:
         """
         計算傷害
-        基於 Pokemon 經典傷害公式
+        新版簡化公式: 威力 × (1 + 屬性倍率 + Prompt倍率)
 
         Args:
-            attacker_level: 攻擊方等級
-            attacker_attack: 攻擊方攻擊力
-            defender_defense: 防禦方防禦力
             skill_power: 技能威力
             skill_type: 技能屬性
             defender_type: 防禦方屬性
-            is_critical: 是否會心一擊（可選，預設隨機判定）
+            prompt_multiplier: Prompt倍率 (0.0 到 0.5，預設 0.0)
 
         Returns:
             (傷害值, 屬性相剋倍率, 效果訊息)
         """
-        # 基礎傷害計算
-        # damage = ((2 * level / 5 + 2) * power * (attack / defense)) / 50 + 2
-        base_damage = (
-            ((2 * attacker_level / 5 + 2) * skill_power * (attacker_attack / defender_defense))
-            / 50
-            + 2
-        )
+        # 獲取屬性相剋倍率
+        attribute_multiplier = cls.get_type_effectiveness(skill_type, defender_type)
 
-        # 會心一擊判定（5% 機率）
-        if not is_critical:
-            is_critical = random.random() < 0.05
+        # 檢查是否免疫（-1.0）
+        if attribute_multiplier == -1.0:
+            return 0, attribute_multiplier, cls.get_effectiveness_message(attribute_multiplier)
 
-        if is_critical:
-            base_damage *= 1.5
+        # 計算傷害: 威力 × (1 + 屬性倍率 + Prompt倍率)
+        # 屬性倍率: +0.25 (優勢), 0.0 (普通), -0.2 (劣勢)
+        # Prompt倍率: 0.0 ~ 0.5 (0%, 10%, 20%, 30%, 40%, 50%)
+        final_damage = skill_power * (1 + attribute_multiplier + prompt_multiplier)
 
-        # 屬性相剋
-        effectiveness = cls.get_type_effectiveness(skill_type, defender_type)
-        base_damage *= effectiveness
+        # 轉為整數
+        final_damage = int(final_damage)
 
-        # 隨機浮動 (85% ~ 100%)
-        random_factor = random.uniform(0.85, 1.0)
-        final_damage = int(base_damage * random_factor)
-
-        # 最少傷害為 1
+        # 最少傷害為 1（除非免疫）
         final_damage = max(1, final_damage)
 
         # 效果訊息
-        message = cls.get_effectiveness_message(effectiveness)
-        if is_critical:
-            message = "會心一擊！" + message
+        message = cls.get_effectiveness_message(attribute_multiplier)
 
-        return final_damage, effectiveness, message
+        return final_damage, attribute_multiplier, message
 
     @classmethod
     def get_all_type_chart(cls) -> Dict[str, Dict[str, float]]:
