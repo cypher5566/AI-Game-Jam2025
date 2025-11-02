@@ -218,17 +218,17 @@ class GeminiService:
         生成寶可夢背面圖片 (使用 Gemini 2.5 Flash Image - Nano Banana 🍌)
 
         Args:
-            front_image_bytes: 正面圖片 (32x32 像素化後的圖片)
+            front_image_bytes: 正面圖片 (64x64 像素化後的圖片)
             pokemon_type: 寶可夢屬性
 
         Returns:
-            背面圖片 bytes，如果失敗返回 None
+            背面圖片 bytes (64x64 像素化)，如果失敗返回 None
 
         實作方式:
             1. 檢查每日用量限額
-            2. 使用 Gemini 2.5 Flash Image 進行圖片生成
+            2. 使用 Gemini 2.5 Flash Image 進行圖片生成 (1024x1024)
             3. Prompt 要求生成背面視角
-            4. 保持像素風格
+            4. 將生成的圖片像素化為 64x64
             5. 記錄 AI 使用量
         """
         # 檢查是否超過每日限額
@@ -249,7 +249,7 @@ Based on this front-view image, generate the BACK VIEW (from behind) of this pok
 
 Requirements:
 - Show the pokemon from BEHIND (back view, not front)
-- Maintain the EXACT same pixel art style (32x32 pixel aesthetic)
+- Maintain the EXACT same pixel art style (64x64 pixel aesthetic)
 - Keep the same color scheme and {pokemon_type} type characteristics ({type_chinese}系)
 - Simple and clear design
 - Same size and proportions
@@ -276,16 +276,37 @@ Important: This is a back sprite for a pokemon game, similar to Pokemon games wh
             # 提取生成的圖片
             for part in response.parts:
                 if part.inline_data is not None:
-                    # 獲取圖片數據
+                    # 獲取圖片數據 (1024x1024)
                     generated_image_bytes = part.inline_data.data
 
-                    logger.info("✅ AI 背面圖片生成成功")
-                    logger.debug(f"   圖片大小: {len(generated_image_bytes)} bytes")
+                    logger.info("✅ AI 背面圖片生成成功 (1024x1024)")
+                    logger.debug(f"   原始圖片大小: {len(generated_image_bytes)} bytes")
 
-                    # 記錄 AI 使用量（成功生成才記錄）
-                    self._record_ai_usage(cost_usd=0.039)
+                    # 將生成的圖片像素化為 64x64
+                    try:
+                        generated_image = Image.open(io.BytesIO(generated_image_bytes))
 
-                    return generated_image_bytes
+                        # 縮小到 64x64 (使用 NEAREST 保持像素風格)
+                        pixelated_image = generated_image.resize((64, 64), Image.Resampling.NEAREST)
+
+                        # 轉換為 bytes
+                        output = io.BytesIO()
+                        pixelated_image.save(output, format="PNG")
+                        output.seek(0)
+                        pixelated_bytes = output.read()
+
+                        logger.info("✅ 背面圖片像素化完成 (64x64)")
+                        logger.debug(f"   像素化後大小: {len(pixelated_bytes)} bytes")
+
+                        # 記錄 AI 使用量（成功生成才記錄）
+                        self._record_ai_usage(cost_usd=0.039)
+
+                        return pixelated_bytes
+                    except Exception as pixelate_error:
+                        logger.error(f"❌ 像素化處理失敗: {pixelate_error}")
+                        # 如果像素化失敗，返回原圖
+                        self._record_ai_usage(cost_usd=0.039)
+                        return generated_image_bytes
 
             # 如果沒有找到圖片數據（不記錄用量）
             logger.warning("⚠️  API 返回成功但沒有圖片數據")

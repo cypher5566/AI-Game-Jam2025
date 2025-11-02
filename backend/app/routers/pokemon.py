@@ -11,6 +11,7 @@ import asyncio
 
 from app.services.image_processor import ImageProcessor
 from app.services.gemini_service import get_gemini_service
+from app.services.skills_service import SkillsService
 from app.database import get_service_db
 from app.config import settings
 
@@ -99,6 +100,12 @@ async def process_pokemon_image(upload_id: str, file_path: str):
 
         back_image_b64 = ImageProcessor.to_base64(back_image_bytes)
 
+        # 4. 根據屬性選擇 12 個技能
+        skills_service = SkillsService()
+        skills = skills_service.get_skills_by_type(pokemon_type, count=12)
+
+        logger.info(f"🎯 為 {pokemon_type} 屬性選擇了 {len(skills)} 個技能")
+
         # 更新資料庫狀態為完成
         db.table("upload_queue").update({
             "status": "completed",
@@ -106,7 +113,8 @@ async def process_pokemon_image(upload_id: str, file_path: str):
                 "front_image": front_image_b64,
                 "back_image": back_image_b64,
                 "type": pokemon_type,
-                "type_chinese": type_chinese
+                "type_chinese": type_chinese,
+                "skills": skills
             }
         }).eq("upload_id", upload_id).execute()
 
@@ -140,7 +148,20 @@ async def get_processing_status(upload_id: str):
                 "front_image": "data:image/png;base64,...",
                 "back_image": "data:image/png;base64,...",
                 "type": "fire",
-                "type_chinese": "火"
+                "type_chinese": "火",
+                "skills": [
+                    {
+                        "id": 52,
+                        "name": "火焰放射",
+                        "name_en": "Flamethrower",
+                        "type": "fire",
+                        "power": 90,
+                        "accuracy": 100,
+                        "pp": 15,
+                        "description": "..."
+                    },
+                    // ... 11 more skills
+                ]
             }
         }
     """
@@ -182,7 +203,8 @@ async def get_processing_status(upload_id: str):
                 "front_image": processed_data.get("front_image"),
                 "back_image": processed_data.get("back_image"),
                 "type": processed_data.get("type"),
-                "type_chinese": processed_data.get("type_chinese")
+                "type_chinese": processed_data.get("type_chinese"),
+                "skills": processed_data.get("skills", [])
             }
         }
 

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GenPoke - AI 生成結果查看器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .input-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 30px;
+            display: none;
+        }
+        .image-container {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .image-box {
+            text-align: center;
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .image-box h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        .image-box img {
+            max-width: 400px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            image-rendering: pixelated;
+        }
+        .info {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .error {
+            background: #ffebee;
+            border-left-color: #f44336;
+            color: #c62828;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .download-btn {
+            background: #2196F3;
+            padding: 8px 16px;
+            margin-top: 10px;
+            width: auto;
+            display: inline-block;
+        }
+        .download-btn:hover {
+            background: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 GenPoke AI 生成結果查看器</h1>
+
+        <div class="input-group">
+            <label for="uploadId">Upload ID：</label>
+            <input type="text" id="uploadId" placeholder="貼上你的 upload_id，例如：1ae2f493-f288-4b77-8a22-d65dd564e401">
+        </div>
+
+        <button onclick="fetchResult()">查看 AI 生成結果</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>處理中，請稍候...</p>
+        </div>
+
+        <div class="result" id="result">
+            <div class="info" id="info"></div>
+
+            <div class="image-container" id="images"></div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchResult() {
+            const uploadId = document.getElementById('uploadId').value.trim();
+
+            if (!uploadId) {
+                alert('請輸入 Upload ID');
+                return;
+            }
+
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            const info = document.getElementById('info');
+            const images = document.getElementById('images');
+
+            // 顯示 loading
+            loading.style.display = 'block';
+            result.style.display = 'none';
+
+            try {
+                const response = await fetch(`http://localhost:8000/api/v1/pokemon/process/${uploadId}`);
+                const data = await response.json();
+
+                loading.style.display = 'none';
+                result.style.display = 'block';
+
+                if (data.status === 'completed') {
+                    // 顯示信息
+                    info.className = 'info';
+                    info.innerHTML = `
+                        <strong>✅ 處理完成！</strong><br>
+                        屬性：<strong>${data.data.type_chinese} (${data.data.type})</strong>
+                    `;
+
+                    // 顯示圖片
+                    images.innerHTML = `
+                        <div class="image-box">
+                            <h3>前端圖 (像素化)</h3>
+                            <img src="${data.data.front_image}" alt="Front Image">
+                            <br>
+                            <button class="download-btn" onclick="downloadImage('${data.data.front_image}', 'front_image.png')">
+                                💾 下載前端圖
+                            </button>
+                        </div>
+                        <div class="image-box">
+                            <h3>背面圖 (AI 生成) ✨</h3>
+                            <img src="${data.data.back_image}" alt="Back Image">
+                            <br>
+                            <button class="download-btn" onclick="downloadImage('${data.data.back_image}', 'back_image.png')">
+                                💾 下載背面圖
+                            </button>
+                        </div>
+                    `;
+                } else if (data.status === 'processing') {
+                    info.className = 'info';
+                    info.innerHTML = '<strong>⏳ 處理中...</strong><br>請稍候片刻後再查詢';
+                    images.innerHTML = '';
+                } else if (data.status === 'failed') {
+                    info.className = 'info error';
+                    info.innerHTML = `<strong>❌ 處理失敗</strong><br>${data.error?.message || '未知錯誤'}`;
+                    images.innerHTML = '';
+                } else {
+                    info.className = 'info error';
+                    info.innerHTML = '<strong>❌ 找不到此上傳記錄</strong>';
+                    images.innerHTML = '';
+                }
+            } catch (error) {
+                loading.style.display = 'none';
+                result.style.display = 'block';
+                info.className = 'info error';
+                info.innerHTML = `<strong>❌ 錯誤</strong><br>${error.message}`;
+                images.innerHTML = '';
+            }
+        }
+
+        function downloadImage(dataUrl, filename) {
+            const link = document.createElement('a');
+            link.href = dataUrl;
+            link.download = filename;
+            link.click();
+        }
+
+        // 支持 Enter 鍵
+        document.getElementById('uploadId').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fetchResult();
+            }
+        });
+    </script>
+</body>
+</html>

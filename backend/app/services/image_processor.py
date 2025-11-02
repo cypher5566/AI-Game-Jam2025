@@ -21,7 +21,7 @@ class ImageProcessor:
     """圖片處理服務類"""
 
     ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-    PIXEL_SIZE = 32  # 32x32 像素
+    PIXEL_SIZE = 64  # 64x64 像素
 
     @classmethod
     async def save_upload(cls, file: UploadFile) -> Tuple[str, str]:
@@ -97,13 +97,11 @@ class ImageProcessor:
                 elif img.mode != "RGB":
                     img = img.convert("RGB")
 
-                # 第一步：縮小到 32x32 (使用 NEAREST 保持像素風格)
+                # 第一步：縮小到 64x64 (使用 NEAREST 保持像素風格)
                 img_small = img.resize((cls.PIXEL_SIZE, cls.PIXEL_SIZE), Image.Resampling.NEAREST)
 
-                # 可選：再放大回更大的尺寸 (例如 128x128) 以便顯示
-                # 這樣可以保持像素化效果同時讓圖片更清晰
-                display_size = 128
-                img_pixelated = img_small.resize((display_size, display_size), Image.Resampling.NEAREST)
+                # 不再放大，直接使用 64x64
+                img_pixelated = img_small
 
                 # 轉換為 bytes
                 output = io.BytesIO()
