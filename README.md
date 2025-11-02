@@ -1,6 +1,6 @@
 # AI-Game-Jam2025
 
-AI Game Jam 2025 專案
+AI Game Jam 2025 專案 - GenPoke
 
 ## 專案結構
 
