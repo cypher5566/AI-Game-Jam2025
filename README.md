@@ -1,5 +1,17 @@
 # AI-Game-Jam2025
 
-測試 README 文件
+AI Game Jam 2025 專案
 
-這是一個測試提交，確認 Git 設定正常運作。
+## 專案結構
+
+```
+├── frontend/    # 前端開發區域
+└── backend/     # 後端開發區域 (負責人: cypher5566)
+```
+
+## 團隊分工
+- **Backend**: cypher5566
+- **Frontend**: 待定
+
+## 開始開發
+請進入對應的資料夾查看詳細說明。
